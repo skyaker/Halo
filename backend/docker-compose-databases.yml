@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: habitlogger-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: habit
+      POSTGRES_PASSWORD: loggerpass
+      POSTGRES_DB: habitlogger_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - habitlogger-net
+
+volumes:
+  pgdata:
+
+networks:
+  habitlogger-net:
+    driver: bridge
