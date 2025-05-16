@@ -2,7 +2,7 @@ services:
   postgres:
     image: postgres:15
     container_name: habitlogger-postgres
-    restart: unless-stopped
+    restart: always
     environment:
       POSTGRES_USER: habit
       POSTGRES_PASSWORD: loggerpass
