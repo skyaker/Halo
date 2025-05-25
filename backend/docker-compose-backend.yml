@@ -1,0 +1,15 @@
+services:
+  note_service:
+    container_name: note_service
+    build:
+      context: ./note_service
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    restart: always
+    networks: [backend]
+
+networks:
+  backend:
+    driver: bridge
+    external: true
