@@ -10,8 +10,21 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      # - pgdata:/var/lib/postgresql/data
       - ./note_service/db/init:/docker-entrypoint-initdb.d
+    networks: [backend]
+
+  user_postgres:
+    image: postgres:17
+    container_name: ${USER_POSTGRES}
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${USER_DB}
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./user_service/db/init:/docker-entrypoint-initdb.d
     networks: [backend]
 
 networks:

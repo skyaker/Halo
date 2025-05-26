@@ -1,7 +1,8 @@
-INSERT INTO notes (user_id, type_id, content, created_at, updated_at, ended_at, completed) VALUES
+INSERT INTO notes (id, user_id, type_id, content, created_at, updated_at, ended_at, completed) VALUES
 (
-  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 
-  'd3eebc99-9c0b-4ef8-bb6d-6bb9bd380a22',
+  '11111111-1111-1111-1111-111111111111',
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  'dddddddd-dddd-dddd-dddd-dddddddddddd',
   'Купить продукты: молоко, хлеб, яйца',
   '2024-01-15 09:00:00',
   '2024-01-15 10:30:00',
@@ -9,8 +10,9 @@ INSERT INTO notes (user_id, type_id, content, created_at, updated_at, ended_at, 
   TRUE
 ),
 (
-  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-  'd3eebc99-9c0b-4ef8-bb6d-6bb9bd380a23',
+  '22222222-2222-2222-2222-222222222222',
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
   'Записаться на приём к врачу',
   '2024-01-16 14:00:00',
   '2024-01-17 18:00:00',
@@ -18,8 +20,9 @@ INSERT INTO notes (user_id, type_id, content, created_at, updated_at, ended_at, 
   TRUE
 ),
 (
-  'b2eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
-  'd3eebc99-9c0b-4ef8-bb6d-6bb9bd380a24',
+  '33333333-3333-3333-3333-333333333333',
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  'ffffffff-ffff-ffff-ffff-ffffffffffff',
   'Написать отчёт по проекту до пятницы',
   '2024-02-01 10:00:00',
   '2024-02-03 16:45:00',
@@ -27,8 +30,9 @@ INSERT INTO notes (user_id, type_id, content, created_at, updated_at, ended_at, 
   FALSE
 ),
 (
-  'b2eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
-  'd3eebc99-9c0b-4ef8-bb6d-6bb9bd380a22',
+  '44444444-4444-4444-4444-444444444444',
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  'dddddddd-dddd-dddd-dddd-dddddddddddd',
   'Позвонить клиенту по поводу договора',
   '2024-02-05 11:20:00',
   '2024-02-05 11:20:00',
@@ -36,8 +40,9 @@ INSERT INTO notes (user_id, type_id, content, created_at, updated_at, ended_at, 
   FALSE
 ),
 (
-  'c4eebc99-9c0b-4ef8-bb6d-6bb9bd380a13',
-  'd3eebc99-9c0b-4ef8-bb6d-6bb9bd380a23',
+  '55555555-5555-5555-5555-555555555555',
+  'cccccccc-cccc-cccc-cccc-cccccccccccc',
+  'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
   'Оплатить счета за коммунальные услуги',
   '2024-01-25 08:00:00',
   '2024-01-30 12:00:00',
@@ -45,8 +50,9 @@ INSERT INTO notes (user_id, type_id, content, created_at, updated_at, ended_at, 
   FALSE
 ),
 (
-  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-  'd3eebc99-9c0b-4ef8-bb6d-6bb9bd380a24',
+  '66666666-6666-6666-6666-666666666666',
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  'ffffffff-ffff-ffff-ffff-ffffffffffff',
   'Обновить резюме на hh.ru',
   '2024-01-10 15:30:00',
   '2024-01-20 09:15:00',
@@ -54,4 +60,9 @@ INSERT INTO notes (user_id, type_id, content, created_at, updated_at, ended_at, 
   FALSE
 );
 
-SELECT COUNT(*) AS total_notes FROM notes;
+SELECT 
+  id, 
+  LEFT(content, 20) || '...' AS preview, 
+  completed,
+  CASE WHEN ended_at IS NULL THEN 'active' ELSE 'completed' END AS status
+FROM notes;

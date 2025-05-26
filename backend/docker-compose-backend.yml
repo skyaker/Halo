@@ -9,6 +9,16 @@ services:
     restart: always
     networks: [backend]
 
+  user_service:
+    container_name: user_service
+    build:
+      context: ./user_service
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    restart: always
+    networks: [backend]
+
 networks:
   backend:
     driver: bridge

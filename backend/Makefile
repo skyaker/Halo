@@ -11,7 +11,7 @@ COMPOSE := docker compose -p $(PROJECT_NAME) -f $(DATABASES)
 COMPOSE_BACKEND := docker compose -p $(PROJECT_NAME) -f $(BACKEND)
 
 # DIRS = note_service category_service auth_service
-DIRS = note_service
+DIRS = note_service user_service
 
 .PHONY: all
 all: down-all network-all build-all up-all
@@ -46,7 +46,13 @@ rm-network:
 
 .PHONY: clean-postgres
 clean-postgres:
-	@docker rm -f $(POSTGRES_CONTAINER_NAME) || true
+	@for dir in $(DIRS); do \
+		if [ "$$dir" = "note_service" ]; then \
+			DB_NAME=$(NOTE_DB); \
+			CONTAINER_NAME=$(NOTE_POSTGRES); \
+		fi; \
+		docker rm -f $$CONTAINER_NAME || true; \
+	done
 
 .PHONY: down-databases
 down-databases:
