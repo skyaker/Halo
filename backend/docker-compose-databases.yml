@@ -1,17 +1,17 @@
 services:
   note_postgres:
     image: postgres:17
-    container_name: note_postgres
+    container_name: ${NOTE_POSTGRES}
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: ${NOTE_DB}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       # - pgdata:/var/lib/postgresql/data
-      - ./database/init:/docker-entrypoint-initdb.d
+      - ./note_service/db/init:/docker-entrypoint-initdb.d
     networks: [backend]
 
 networks:

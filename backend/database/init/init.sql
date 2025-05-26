@@ -14,17 +14,6 @@ CREATE TABLE note_types (
   name VARCHAR(100) NOT NULL
 );
 
-CREATE TABLE notes (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  type_id UUID REFERENCES note_types(id) ON DELETE SET NULL,
-  content TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  ended_at TIMESTAMP,
-  completed BOOLEAN DEFAULT FALSE
-);
-
 CREATE TABLE goals (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,

@@ -8,6 +8,10 @@ DATABASES := docker-compose-databases.yml
 BACKEND := docker-compose-backend.yml
 
 COMPOSE := docker compose -p $(PROJECT_NAME) -f $(DATABASES)
+COMPOSE_BACKEND := docker compose -p $(PROJECT_NAME) -f $(BACKEND)
+
+# DIRS = note_service category_service auth_service
+DIRS = note_service
 
 .PHONY: all
 all: down-all network-all build-all up-all
@@ -58,25 +62,29 @@ up-databases:
 
 .PHONY: pg-seed-data
 pg-seed-data:
-	@docker exec -i $(POSTGRES_CONTAINER_NAME) psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) < ../data/sql/seed_data.sql
+	@for dir in $(DIRS); do \
+		if [ "$$dir" = "note_service" ]; then \
+			DB_NAME=$(NOTE_DB); \
+			CONTAINER_NAME=$(NOTE_POSTGRES); \
+		fi; \
+		docker exec -i $$CONTAINER_NAME psql -U $(POSTGRES_USER) -d $$DB_NAME < $$dir/db/init/seed_data.sql; \
+	done
 
 # -------------------------------------------SERVICES-------------------------------------------
 
 .PHONY: down-backend
 down-backend:
-	@docker compose -f ${BACKEND} down || true
+	$(COMPOSE_BACKEND) down || true
 
 .PHONY: build-backend
 build-backend:
-	@docker compose -f ${BACKEND} build
+	$(COMPOSE_BACKEND) build
 
 .PHONY: up-backend
 up-backend:
-	@docker compose -f ${BACKEND} up --build -d
+	$(COMPOSE_BACKEND) up --build -d
 
 # -------------------------------------------FILES------------------------------------------- 
-
-DIRS = note_service category_service auth_service
 
 .PHONY: update-env
 update-env:
