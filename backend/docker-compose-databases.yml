@@ -27,7 +27,40 @@ services:
       - ./user_service/db/init:/docker-entrypoint-initdb.d
     networks: [backend]
 
+  auth_postgres:
+    image: postgres:17
+    container_name: ${AUTH_POSTGRES}
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AUTH_DB}
+    ports:
+      - "5435:5432"
+    volumes:
+      - ./auth_service/db/init:/docker-entrypoint-initdb.d
+    networks: [backend]
+
+  auth_redis:
+    container_name: ${AUTH_REDIS}
+    image: redis:8-alpine
+    volumes:
+      - redis_data:/data
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+    ports:
+      - ${REDIS_PORT}:${REDIS_PORT}
+    tty: true
+    networks: [backend]
+
 networks:
   backend:
     driver: bridge
     external: true
+
+volumes:
+  redis_data:

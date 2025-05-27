@@ -1,6 +1,23 @@
 services:
+  nginx:
+    image: nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - type: bind
+        source: ./nginx/nginx.conf
+        target: /etc/nginx/conf.d/default.conf
+        read_only: true
+    depends_on:
+      - auth_service
+      - note_service
+      - user_service
+    networks: [backend]
+
   note_service:
     container_name: note_service
+    ports: 
+      - "8080"
     build:
       context: ./note_service
       dockerfile: Dockerfile
@@ -11,8 +28,22 @@ services:
 
   user_service:
     container_name: user_service
+    ports: 
+      - "8080"
     build:
       context: ./user_service
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    restart: always
+    networks: [backend]
+
+  auth_service:
+    container_name: auth_service
+    ports: 
+      - "8080"
+    build:
+      context: ./auth_service
       dockerfile: Dockerfile
     env_file:
       - .env

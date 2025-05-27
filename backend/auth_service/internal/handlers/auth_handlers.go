@@ -13,22 +13,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func checkUserExistence(db *sql.DB, username *string, email *string) error {
+func checkUserExistence(db *sql.DB, login *string) error {
 	query := `SELECT user_id 
-						FROM users 
-						WHERE username = $1 OR email = $2`
-	row := db.QueryRow(query, username, email)
-
-	err := row.Scan(new(int))
-
-	return err
-}
-
-func checkAdminCredentials(db *sql.DB, username *string, password *string) error {
-	query := `SELECT id 
-						FROM admins 
-						WHERE username = $1 and password = $2`
-	row := db.QueryRow(query, username, password)
+						FROM auth_credentials
+						WHERE login = $1`
+	row := db.QueryRow(query, login)
 
 	err := row.Scan(new(int))
 
@@ -37,7 +26,7 @@ func checkAdminCredentials(db *sql.DB, username *string, password *string) error
 
 func authInfoCheck(db *sql.DB, email *string, password *string) error {
 	var hashedPassword string
-	err := checkUserExistence(db, nil, email)
+	err := checkUserExistence(db, nil)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("unauthorized: invalid credentials")
@@ -66,9 +55,9 @@ func authInfoCheck(db *sql.DB, email *string, password *string) error {
 	return nil
 }
 
-func addUserToDB(db *sql.DB, user *models.UserRegisterInfo) (uint, error) {
+func addUserCredentials(db *sql.DB, user *models.UserRegisterInfo) (uint, error) {
 	var existence bool
-	err := checkUserExistence(db, &user.Username, &user.Email)
+	err := checkUserExistence(db, &user.Login)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			existence = false
@@ -86,9 +75,9 @@ func addUserToDB(db *sql.DB, user *models.UserRegisterInfo) (uint, error) {
 		return 0, fmt.Errorf("error hashing password")
 	}
 
-	query := `INSERT INTO users (username, name, email, password_hash, created_at, avatar_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING user_id`
+	query := `INSERT INTO auth_credentials (login, password_hash, created_at) VALUES ($1, $2, $3) RETURNING user_id`
 	var userId int
-	err = db.QueryRow(query, user.Username, user.Name, user.Email, hashedPassword, time.Now().Unix(), "default-avatar.svg").
+	err = db.QueryRow(query, user.Login, hashedPassword, time.Now().Unix()).
 		Scan(&userId)
 	if err != nil {
 		return 0, err
@@ -106,7 +95,7 @@ func RegisterUser(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 			return
 		}
 
-		userId, err := addUserToDB(db, &userData)
+		userId, err := addUserCredentials(db, &userData)
 		if err != nil {
 			if err.Error() == "user already exists" {
 				http.Error(w, "User already exists", http.StatusBadRequest)
@@ -181,54 +170,6 @@ func Login(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 
 		http.SetCookie(w, &http.Cookie{
 			Name:     "session_token",
-			Value:    token,
-			HttpOnly: true,
-			Secure:   false,
-			SameSite: http.SameSiteLaxMode,
-			Path:     "/",
-			Expires:  time.Now().Add(6 * 30 * 24 * time.Hour),
-		})
-
-		w.WriteHeader(http.StatusOK)
-	}
-}
-
-func AdminLogin(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var adminData models.AdminLoginStruct
-		var adminId uint
-
-		if err := json.NewDecoder(r.Body).Decode(&adminData); err != nil {
-			http.Error(w, "Bad request", http.StatusBadRequest)
-			return
-		}
-
-		err := checkAdminCredentials(db, &adminData.Username, &adminData.Password)
-		if err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		query := `SELECT id 
-							FROM admins 
-							WHERE username = $1`
-
-		if err = db.QueryRow(query, adminData.Username).Scan(&adminId); err != nil {
-			if err == sql.ErrNoRows {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			} else {
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-			}
-		}
-
-		token, err := CreateAdminToken(redisDb, &adminId)
-		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		http.SetCookie(w, &http.Cookie{
-			Name:     "admin_token",
 			Value:    token,
 			HttpOnly: true,
 			Secure:   false,

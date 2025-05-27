@@ -8,7 +8,7 @@ import (
 )
 
 func GetDbConnection() *sql.DB {
-	host, _ := os.LookupEnv("POSTGRES_HOST")
+	host, _ := os.LookupEnv("AUTH_POSTGRES")
 
 	port, _ := os.LookupEnv("POSTGRES_PORT")
 	portInt, _ := strconv.Atoi(port)
@@ -16,7 +16,7 @@ func GetDbConnection() *sql.DB {
 
 	user, _ := os.LookupEnv("POSTGRES_USER")
 	password, _ := os.LookupEnv("POSTGRES_PASSWORD")
-	dbname, _ := os.LookupEnv("NOTE_DB")
+	dbname, _ := os.LookupEnv("AUTH_DB")
 
 	psqlInfo := fmt.Sprintf(
 		"host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable",

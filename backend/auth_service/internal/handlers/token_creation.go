@@ -8,15 +8,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 )
-
-func init() {
-	if err := godotenv.Load(); err != nil {
-		fmt.Println("No .env file found")
-	}
-}
 
 type UserTokenBody struct {
 	UserId uint `json:"user_id"`

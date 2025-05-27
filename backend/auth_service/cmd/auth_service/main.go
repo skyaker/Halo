@@ -50,7 +50,7 @@ func main() {
 	r.Post("/api/auth/login", handlers.Login(db, redisDb))
 
 	log.Println("Auth server is running")
-	err = http.ListenAndServe(":8100", r)
+	err = http.ListenAndServe(":8080", r)
 	if err != nil {
 		log.Fatal("Server failed to start:", err)
 	}

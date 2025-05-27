@@ -1,10 +1,10 @@
 package models
 
 type UserRegisterInfo struct {
-	Username string `json:"username"`
-	Name     string `json:"name"`
-	Email    string `json:"email"`
+	Login    string `json:"login"`
 	Password string `json:"password"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
 }
 
 type UserRegisterResponse struct {
