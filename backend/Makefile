@@ -11,7 +11,7 @@ COMPOSE := docker compose -p $(PROJECT_NAME) -f $(DATABASES)
 COMPOSE_BACKEND := docker compose -p $(PROJECT_NAME) -f $(BACKEND)
 
 # DIRS = note_service category_service auth_service
-DIRS = note_service user_service
+DIRS = note_service user_service auth_service
 
 .PHONY: all
 all: down-all network-all build-all up-all

@@ -1,4 +1,4 @@
-INSERT INTO auth_credentials (user_id, username, email, password_hash, created_at) VALUES
+INSERT INTO auth_credentials (user_id, login, password_hash, created_at) VALUES
 (
   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   'alice',

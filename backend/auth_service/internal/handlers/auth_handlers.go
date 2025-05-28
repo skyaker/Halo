@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
+
+	// "strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -55,35 +58,38 @@ func authInfoCheck(db *sql.DB, email *string, password *string) error {
 	return nil
 }
 
-func addUserCredentials(db *sql.DB, user *models.UserRegisterInfo) (uint, error) {
+func addUserCredentials(db *sql.DB, user *models.UserRegisterInfo) (uuid.UUID, error) {
 	var existence bool
 	err := checkUserExistence(db, &user.Login)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			existence = false
 		} else {
-			return 0, fmt.Errorf("database error")
+			return uuid.UUID{}, err
 		}
 	}
 
 	if existence {
-		return 0, fmt.Errorf("user already exists")
+		return uuid.UUID{}, fmt.Errorf("user already exists")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return 0, fmt.Errorf("error hashing password")
+		return uuid.UUID{}, fmt.Errorf("error hashing password")
 	}
 
-	query := `INSERT INTO auth_credentials (login, password_hash, created_at) VALUES ($1, $2, $3) RETURNING user_id`
-	var userId int
-	err = db.QueryRow(query, user.Login, hashedPassword, time.Now().Unix()).
-		Scan(&userId)
+	query := `INSERT INTO auth_credentials (user_id, login, password_hash, created_at) VALUES ($1, $2, $3, $4)`
+	userId, err := uuid.NewV7()
 	if err != nil {
-		return 0, err
+		return uuid.UUID{}, err
 	}
 
-	return uint(userId), nil
+	_, err = db.Exec(query, userId, user.Login, hashedPassword, time.Now().Unix())
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+
+	return userId, nil
 }
 
 func RegisterUser(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
@@ -91,19 +97,22 @@ func RegisterUser(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 		var userData models.UserRegisterInfo
 
 		if err := json.NewDecoder(r.Body).Decode(&userData); err != nil {
-			http.Error(w, "Bad request", http.StatusBadRequest)
+			log.Error().Err(err).Msg("Bad request")
 			return
 		}
 
 		userId, err := addUserCredentials(db, &userData)
 		if err != nil {
 			if err.Error() == "user already exists" {
+				log.Error().Err(err).Msg("User already exists")
 				http.Error(w, "User already exists", http.StatusBadRequest)
 				return
 			} else if err.Error() == "database error" {
+				log.Error().Err(err).Msg("Database error")
 				http.Error(w, "Database error", http.StatusInternalServerError)
 				return
 			} else {
+				log.Error().Err(err).Msg("Internal server error")
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -111,7 +120,7 @@ func RegisterUser(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 
 		token, err := CreateToken(redisDb, &userId)
 		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			log.Error().Err(err).Msg("Internal server error")
 			return
 		}
 
@@ -131,52 +140,52 @@ func RegisterUser(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 
 func Login(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var userData models.UserLogin
-		var userId uint
-
-		if err := json.NewDecoder(r.Body).Decode(&userData); err != nil {
-			http.Error(w, "Bad request", http.StatusBadRequest)
-			return
-		}
-
-		err := authInfoCheck(db, &userData.Email, &userData.Password)
-		if err != nil {
-			if strings.Contains(err.Error(), "unauthorized") {
-				// log (?)
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			} else {
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-			}
-			return
-		}
-
-		query := `SELECT user_id 
-							FROM users 
-							WHERE email = $1`
-
-		if err = db.QueryRow(query, userData.Email).Scan(&userId); err != nil {
-			if err == sql.ErrNoRows {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			} else {
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-			}
-		}
-
-		token, err := CreateToken(redisDb, &userId)
-		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		http.SetCookie(w, &http.Cookie{
-			Name:     "session_token",
-			Value:    token,
-			HttpOnly: true,
-			Secure:   false,
-			SameSite: http.SameSiteLaxMode,
-			Path:     "/",
-			Expires:  time.Now().Add(6 * 30 * 24 * time.Hour),
-		})
+		// var userData models.UserLogin
+		// var userId uint
+		//
+		// if err := json.NewDecoder(r.Body).Decode(&userData); err != nil {
+		// 	http.Error(w, "Bad request", http.StatusBadRequest)
+		// 	return
+		// }
+		//
+		// err := authInfoCheck(db, &userData.Email, &userData.Password)
+		// if err != nil {
+		// 	if strings.Contains(err.Error(), "unauthorized") {
+		// 		// log (?)
+		// 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		// 	} else {
+		// 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		// 	}
+		// 	return
+		// }
+		//
+		// query := `SELECT user_id
+		// 					FROM users
+		// 					WHERE email = $1`
+		//
+		// if err = db.QueryRow(query, userData.Email).Scan(&userId); err != nil {
+		// 	if err == sql.ErrNoRows {
+		// 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		// 	} else {
+		// 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		// 	}
+		// }
+		//
+		// token, err := CreateToken(redisDb, &userId)
+		// if err != nil {
+		// 	http.Error(w, "Internal server error", http.StatusInternalServerError)
+		// 	return
+		// }
+		//
+		// http.SetCookie(w, &http.Cookie{
+		// 	Name:     "session_token",
+		// 	Value:    token,
+		// 	HttpOnly: true,
+		// 	Secure:   false,
+		// 	SameSite: http.SameSiteLaxMode,
+		// 	Path:     "/",
+		// 	Expires:  time.Now().Add(6 * 30 * 24 * time.Hour),
+		// })
 
 		w.WriteHeader(http.StatusOK)
 	}

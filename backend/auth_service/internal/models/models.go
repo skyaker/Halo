@@ -1,5 +1,7 @@
 package models
 
+import "github.com/google/uuid"
+
 type UserRegisterInfo struct {
 	Login    string `json:"login"`
 	Password string `json:"password"`
@@ -8,8 +10,8 @@ type UserRegisterInfo struct {
 }
 
 type UserRegisterResponse struct {
-	User_id uint   `json:"user_id"`
-	Token   string `json:"token"`
+	User_id uuid.UUID `json:"user_id"`
+	Token   string    `json:"token"`
 }
 
 type UserLogin struct {
@@ -23,10 +25,4 @@ type UserLoginResponse struct {
 
 type CheckTokenRequest struct {
 	BackendSessionToken string `json:"backend_session_token"`
-}
-
-type AdminLoginStruct struct {
-	Id       uint   `json:"id"`
-	Username string `json:"username"`
-	Password string `json:"password"`
 }

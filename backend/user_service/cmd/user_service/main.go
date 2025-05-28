@@ -11,11 +11,11 @@ import (
 func main() {
 	r := chi.NewRouter()
 
-	r.Post("api/user", handlers.Testfunc())
+	r.Post("/api/user", handlers.Testfunc())
 	// r.Get
 	// r.Delete()
 	// r.Put
 
 	log.Println("User service is running")
-	http.ListenAndServe(":8080", r)
+	http.ListenAndServe(":8100", r)
 }

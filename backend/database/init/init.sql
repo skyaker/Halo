@@ -1,7 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
   username VARCHAR(255) UNIQUE NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
@@ -9,13 +9,13 @@ CREATE TABLE users (
 );
 
 CREATE TABLE note_types (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   name VARCHAR(100) NOT NULL
 );
 
 CREATE TABLE goals (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   title VARCHAR(255) NOT NULL,
   description TEXT,
@@ -26,7 +26,7 @@ CREATE TABLE goals (
 );
 
 CREATE TABLE sync_log (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   object_type VARCHAR(50) NOT NULL CHECK (object_type IN ('note', 'goal', 'note_type')),
   object_id UUID NOT NULL,
