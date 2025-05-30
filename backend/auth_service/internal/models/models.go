@@ -24,5 +24,5 @@ type UserLoginResponse struct {
 }
 
 type CheckTokenRequest struct {
-	BackendSessionToken string `json:"backend_session_token"`
+	Token string `json:"token"`
 }

@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+
+	"github.com/rs/zerolog/log"
 )
 
 func GetDbConnection() *sql.DB {
 	host, _ := os.LookupEnv("AUTH_POSTGRES")
 
-	port, _ := os.LookupEnv("POSTGRES_PORT")
+	port, _ := os.LookupEnv("AUTH_PG_PORT")
 	portInt, _ := strconv.Atoi(port)
 	portUint := uint(portInt)
 
@@ -29,12 +31,18 @@ func GetDbConnection() *sql.DB {
 
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
-		panic(err)
+		log.Fatal().
+			Err(err).
+			Str("service", "auth_service").
+			Str("process", "pg open")
 	}
 
 	err = db.Ping()
 	if err != nil {
-		panic(err)
+		log.Fatal().
+			Err(err).
+			Str("service", "auth_service").
+			Str("process", "pg ping")
 	}
 
 	return db

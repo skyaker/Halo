@@ -17,13 +17,9 @@ import (
 )
 
 func checkUserExistence(db *sql.DB, login *string) error {
-	query := `SELECT user_id 
-						FROM auth_credentials
-						WHERE login = $1`
-	row := db.QueryRow(query, login)
-
-	err := row.Scan(new(int))
-
+	var exists bool
+	query := `SELECT EXISTS (SELECT 1 FROM auth_credentials WHERE login = $1)`
+	err := db.QueryRow(query, login).Scan(&exists)
 	return err
 }
 
@@ -117,12 +113,14 @@ func RegisterUser(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 				return
 			}
 		}
+		log.Info().Msg("User credentials added successfully")
 
 		token, err := CreateToken(redisDb, &userId)
 		if err != nil {
 			log.Error().Err(err).Msg("Internal server error")
 			return
 		}
+		log.Info().Msg("Session token created successfully")
 
 		http.SetCookie(w, &http.Cookie{
 			Name:     "session_token",

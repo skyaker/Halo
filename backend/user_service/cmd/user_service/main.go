@@ -17,5 +17,5 @@ func main() {
 	// r.Put
 
 	log.Println("User service is running")
-	http.ListenAndServe(":8100", r)
+	http.ListenAndServe(":8080", r)
 }
