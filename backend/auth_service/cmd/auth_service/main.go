@@ -14,13 +14,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
 func main() {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-
 	var db *sql.DB = dbconn.GetDbConnection()
 	defer db.Close()
 
@@ -46,7 +43,7 @@ func main() {
 	// 	AllowedOrigins:   []string{"http://localhost:3000", "http://localhost:8081"},
 	// 	AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 	// 	AllowCredentials: false,
-	// 	AllowedHeaders:   []string{"Content-Type", "Authorization"},
+	// AllowedHeaders: []string{"Content-Type", "Authorization"},
 	// 	MaxAge:           300,
 	// }))
 

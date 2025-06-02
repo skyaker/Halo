@@ -1,7 +1,6 @@
 package auth_handlers
 
 import (
-	models "auth_service/internal/models"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -14,15 +13,16 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 )
 
-func extractUserIdFromToken(tokenStr string) (uint, error) {
+func extractUserIdFromToken(tokenStr string) (uuid.UUID, error) {
 	secretKey, exists := os.LookupEnv("TOKEN_SECRET_KEY")
 	if !exists {
 		log.Error().Msg("Secret key not found")
-		return 0, fmt.Errorf("internal server error: secret key not found")
+		return uuid.UUID{}, fmt.Errorf("internal server error: secret key not found")
 	}
 
 	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
@@ -33,28 +33,34 @@ func extractUserIdFromToken(tokenStr string) (uint, error) {
 		return []byte(secretKey), nil
 	})
 	if err != nil {
-		log.Error().Msg("Token parse error")
-		return 0, fmt.Errorf("bad request: token parse error")
+		log.Error().Err(err).Msg("Token parse error")
+		return uuid.UUID{}, fmt.Errorf("bad request: token parse error")
 	}
 
 	claims, status := token.Claims.(jwt.MapClaims)
 	if !status || !token.Valid {
 		log.Error().Msg("Invalid token")
-		return 0, fmt.Errorf("unauthorized: invalid token")
+		return uuid.UUID{}, fmt.Errorf("unauthorized: invalid token")
 	}
 
-	userIDFloat, ok := claims["user_id"].(float64)
+	fmt.Print(claims)
+	fmt.Print("check")
+
+	userIdRaw, ok := claims["user_id"].(string)
 	if !ok {
+		log.Info().Msg(userIdRaw)
 		log.Error().Msg("User id not found in token")
-		return 0, fmt.Errorf("unauthorized: user_id not found in token")
+		return uuid.UUID{}, fmt.Errorf("unauthorized: user_id not found in token")
 	}
 
-	return uint(userIDFloat), nil
+	// userId := uuid.UUID{byte(userIdRaw)}
+	// log.Info().Msg(userIdRaw.String())
+	return uuid.UUID{}, nil
 }
 
 func CheckToken(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var checkTokenRequest models.CheckTokenRequest
+		// var checkTokenRequest models.CheckTokenRequest
 
 		// if err := json.NewDecoder(r.Body).Decode(&checkTokenRequest); err != nil {
 		// 	log.Error().Err(err).Msg("Json bad request")
@@ -70,9 +76,8 @@ func CheckToken(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 		}
 
 		user_session_token := session_cookie.Value
-		backend_session_token := checkTokenRequest.Token
 
-		if user_session_token == "" || backend_session_token == "" {
+		if user_session_token == "" {
 			log.Error().Msg("Session token is empty")
 			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
@@ -115,7 +120,7 @@ func CheckToken(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 		tokenFound := slices.Contains(tokens, user_session_token)
 
 		if !tokenFound {
-			log.Error().Msg("User token was not foun")
+			log.Error().Msg("User token was not found")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}

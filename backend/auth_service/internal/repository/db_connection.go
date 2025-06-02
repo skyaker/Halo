@@ -45,5 +45,9 @@ func GetDbConnection() *sql.DB {
 			Str("process", "pg ping")
 	}
 
+	log.Info().
+		Str("service", "auth_service").
+		Msg("Postgres connection successfull")
+
 	return db
 }

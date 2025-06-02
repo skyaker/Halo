@@ -16,16 +16,16 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func checkUserExistence(db *sql.DB, login *string) error {
+func checkUserExistence(db *sql.DB, login *string) (bool, error) {
 	var exists bool
 	query := `SELECT EXISTS (SELECT 1 FROM auth_credentials WHERE login = $1)`
 	err := db.QueryRow(query, login).Scan(&exists)
-	return err
+	return exists, err
 }
 
 func authInfoCheck(db *sql.DB, email *string, password *string) error {
 	var hashedPassword string
-	err := checkUserExistence(db, nil)
+	_, err := checkUserExistence(db, nil)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("unauthorized: invalid credentials")
@@ -55,14 +55,10 @@ func authInfoCheck(db *sql.DB, email *string, password *string) error {
 }
 
 func addUserCredentials(db *sql.DB, user *models.UserRegisterInfo) (uuid.UUID, error) {
-	var existence bool
-	err := checkUserExistence(db, &user.Login)
+	existence, err := checkUserExistence(db, &user.Login)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			existence = false
-		} else {
-			return uuid.UUID{}, err
-		}
+		log.Error().Err(err).Str("process", "check user existence")
+		return uuid.UUID{}, err
 	}
 
 	if existence {
@@ -93,7 +89,8 @@ func RegisterUser(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 		var userData models.UserRegisterInfo
 
 		if err := json.NewDecoder(r.Body).Decode(&userData); err != nil {
-			log.Error().Err(err).Msg("Bad request")
+			log.Error().Err(err).Str("process", "register json decode")
+			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
 
@@ -104,11 +101,11 @@ func RegisterUser(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 				http.Error(w, "User already exists", http.StatusBadRequest)
 				return
 			} else if err.Error() == "database error" {
-				log.Error().Err(err).Msg("Database error")
+				log.Error().Err(err).Msg("Add credentials database error")
 				http.Error(w, "Database error", http.StatusInternalServerError)
 				return
 			} else {
-				log.Error().Err(err).Msg("Internal server error")
+				log.Error().Err(err).Str("process", "adding user credentials")
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -117,7 +114,9 @@ func RegisterUser(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 
 		token, err := CreateToken(redisDb, &userId)
 		if err != nil {
-			log.Error().Err(err).Msg("Internal server error")
+			log.Error().
+				Err(err).
+				Str("process", "user token creating")
 			return
 		}
 		log.Info().Msg("Session token created successfully")
