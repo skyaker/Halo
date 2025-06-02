@@ -48,7 +48,7 @@ func main() {
 	// }))
 
 	r.Post("/api/auth/register", handlers.RegisterUser(db, redisDb))
-	r.Post("/api/auth/check_token", handlers.CheckToken(db, redisDb))
+	r.Get("/api/auth/check_token", handlers.CheckToken(db, redisDb))
 	r.Post("/api/auth/login", handlers.Login(db, redisDb))
 
 	log.Info().Msg("Auth server is running")

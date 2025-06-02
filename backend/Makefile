@@ -54,6 +54,10 @@ clean-postgres:
 		docker rm -f $$CONTAINER_NAME || true; \
 	done
 
+.PHONE: clean-auth-redis
+clean-auth-redis:
+	@docker exec -it $(AUTH_REDIS) redis-cli flushall
+
 .PHONY: down-databases
 down-databases:
 	$(COMPOSE) down || true

@@ -43,31 +43,25 @@ func extractUserIdFromToken(tokenStr string) (uuid.UUID, error) {
 		return uuid.UUID{}, fmt.Errorf("unauthorized: invalid token")
 	}
 
-	fmt.Print(claims)
-	fmt.Print("check")
-
 	userIdRaw, ok := claims["user_id"].(string)
 	if !ok {
-		log.Info().Msg(userIdRaw)
 		log.Error().Msg("User id not found in token")
 		return uuid.UUID{}, fmt.Errorf("unauthorized: user_id not found in token")
 	}
 
-	// userId := uuid.UUID{byte(userIdRaw)}
-	// log.Info().Msg(userIdRaw.String())
-	return uuid.UUID{}, nil
+	userId, err := uuid.Parse(userIdRaw)
+	if err != nil {
+		log.Error().Err(err).Msg("String to uuid parse error")
+		return uuid.UUID{}, fmt.Errorf("internal server error: uuid parse failure")
+	}
+
+	log.Info().Str("process", "user id extraction from token").Msg("extraction succeed")
+
+	return userId, nil
 }
 
 func CheckToken(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// var checkTokenRequest models.CheckTokenRequest
-
-		// if err := json.NewDecoder(r.Body).Decode(&checkTokenRequest); err != nil {
-		// 	log.Error().Err(err).Msg("Json bad request")
-		// 	http.Error(w, "Bad request", http.StatusBadRequest)
-		// 	return
-		// }
-
 		session_cookie, err := r.Cookie("session_token")
 		if err != nil {
 			log.Error().Err(err).Msg("Unauthorized")
@@ -117,13 +111,17 @@ func CheckToken(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 			return
 		}
 
+		// fmt.Print(tokens)
+
 		tokenFound := slices.Contains(tokens, user_session_token)
 
 		if !tokenFound {
-			log.Error().Msg("User token was not found")
+			log.Error().Msg("Entered token is invalid")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
+
+		log.Info().Msg("Check token successful")
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
