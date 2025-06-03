@@ -15,7 +15,7 @@ type UserRegisterResponse struct {
 }
 
 type UserLogin struct {
-	Email    string `json:"email"`
+	Login    string `json:"login"`
 	Password string `json:"password"`
 }
 
