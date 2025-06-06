@@ -12,6 +12,7 @@ services:
       - auth_service
       - note_service
       - user_service
+    restart: always
     networks: [backend]
 
   note_service:
