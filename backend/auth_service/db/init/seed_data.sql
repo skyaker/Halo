@@ -9,7 +9,6 @@ INSERT INTO auth_credentials (user_id, login, password_hash, created_at) VALUES
 (
   'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
   'bob',
-  'bob@example.com',
   -- Пароль: "bob123" 
   '$2a$10$VE0tR5c7sYQQYHZ4Q8WZUO5v6z8i1J3p1P3Y/7sYQQYHZ4Q8WZUQe',
   '2024-01-11 09:15:00'
@@ -17,7 +16,6 @@ INSERT INTO auth_credentials (user_id, login, password_hash, created_at) VALUES
 (
   'cccccccc-cccc-cccc-cccc-cccccccccccc',
   'charlie',
-  'charlie@example.com',
   -- Пароль: "charlie123"
   '$2a$10$HZ4Q8WZUO5v6z8i1J3p1P3Y/7sYQQYHZ4Q8WZUQeN9qo8uLOickgx',
   '2024-01-12 10:30:00'
