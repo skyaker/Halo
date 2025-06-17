@@ -6,9 +6,11 @@ SHELL := /bin/bash
 PROJECT_NAME := habitlogger
 DATABASES := docker-compose-databases.yml
 BACKEND := docker-compose-backend.yml
+KAFKA := docker-compose-kafka.yml
 
 COMPOSE := docker compose -p $(PROJECT_NAME) -f $(DATABASES)
 COMPOSE_BACKEND := docker compose -p $(PROJECT_NAME) -f $(BACKEND)
+COMPOSE_KAFKA := docker compose -p $(PROJECT_NAME) -f $(KAFKA)
 
 # DIRS = note_service category_service auth_service
 DIRS = note_service user_service auth_service
@@ -17,13 +19,13 @@ DIRS = note_service user_service auth_service
 all: down-all network-all build-all up-all
 
 .PHONY: down-all
-down-all: down-databases down-backend
+down-all: down-backend down-databases down-kafka
 
 .PHONY: build-all
-build-all: build-databases build-backend
+build-all: build-databases build-kafka build-backend
 
 .PHONY: up-all
-up-all: up-databases up-backend
+up-all: up-databases up-kafka up-backend
 
 .PHONY: clean-all
 clean-all:
@@ -44,10 +46,29 @@ rm-network:
 
 .PHONY: hard-rm-network
 hard-rm-network:
-	docker rm -f $$(docker ps -aq) || true
-	docker volume prune -f || true
-	docker network prune -f || true
-	docker network rm backend frontend || true
+	@docker rm -f $$(docker ps -aq) || true
+	@docker volume prune -f || true
+	@docker network prune -f || true
+	@docker network rm backend frontend || true
+
+# -------------------------------------------KAFKA-------------------------------------------
+
+.PHONY: up-kafka
+up-kafka:
+	$(COMPOSE_KAFKA) up -d --build
+	@make kafka-topic-init
+
+.PHONY: build-kafka
+build-kafka:
+	$(COMPOSE_KAFKA) build --no-cache --force-rm
+
+.PHONY: down-kafka
+down-kafka:
+	$(COMPOSE_KAFKA) down || true
+
+.PHONY: kafka-topic-init
+kafka-topic-init:
+	@docker exec kafka ./opt/kafka/bin/kafka-topics.sh --create --topic user-created --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1 --if-not-exists
 
 # -------------------------------------------DATABASE-------------------------------------------
 
@@ -112,7 +133,7 @@ update-env:
 
 # -------------------------------------------KAFKA------------------------------------------- 
 
-.PHONE: reset-kafka
+.PHONY: reset-kafka
 reset-kafka:
 	@echo "Stopping containers..."
 	docker-compose stop kafka
@@ -121,3 +142,6 @@ reset-kafka:
 	@echo "Starting Kafka again..."
 	docker-compose start kafka
 
+.PHONY: wait
+wait:
+	./wait.sh
