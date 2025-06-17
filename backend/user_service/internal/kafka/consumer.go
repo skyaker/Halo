@@ -1,20 +1,17 @@
-package main
+package kafka_listener
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
-	"time"
+
 	handlers "user_service/internal/handlers"
-	dbconn "user_service/internal/repository"
 
 	"github.com/rs/zerolog/log"
-	"github.com/segmentio/kafka-go"
 
-	"github.com/go-chi/chi/v5"
+	kafka "github.com/segmentio/kafka-go"
 )
 
 func getKafkaReader(kafkaURL, topic, groupID string) *kafka.Reader {
@@ -28,7 +25,7 @@ func getKafkaReader(kafkaURL, topic, groupID string) *kafka.Reader {
 	})
 }
 
-func runKafkaListener(db *sql.DB) {
+func Listen(db *sql.DB) {
 	kafkaURL := fmt.Sprintf("%v:%v", os.Getenv("KAFKA_HOST"), os.Getenv("KAFKA_PORT"))
 	topic := "user-created"
 	groupID := "1"
@@ -59,21 +56,4 @@ func runKafkaListener(db *sql.DB) {
 			log.Error().Msg("user-created processing failed")
 		}
 	}
-}
-
-func main() {
-	log.Info().Msg("Waiting for Kafka to be ready...")
-	time.Sleep(30 * time.Second)
-
-	var db *sql.DB = dbconn.GetDbConnection()
-	defer db.Close()
-
-	go runKafkaListener(db)
-
-	r := chi.NewRouter()
-
-	r.Get("/api/user/existence", handlers.CheckUserExistence(db))
-
-	log.Info().Msg("User service is running")
-	http.ListenAndServe(":8080", r)
 }

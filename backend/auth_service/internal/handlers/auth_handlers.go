@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
+	"github.com/segmentio/kafka-go"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -89,7 +90,7 @@ func addUserCredentials(db *sql.DB, user *models.UserRegisterInfo) (uuid.UUID, e
 	return userId, nil
 }
 
-func RegisterUser(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
+func RegisterUser(db *sql.DB, redisDb *redis.Client, writer *kafka.Writer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var userData models.UserRegisterInfo
 
@@ -116,6 +117,32 @@ func RegisterUser(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 			}
 		}
 		log.Info().Msg("User credentials added successfully")
+
+		event := map[string]any{
+			"id":       userId,
+			"username": "",
+			"email":    "",
+		}
+
+		if userData.Username != "" {
+			event["username"] = userData.Username
+		}
+
+		if userData.Email != "" {
+			event["email"] = userData.Email
+		}
+
+		data, _ := json.Marshal(event)
+
+		err = writer.WriteMessages(r.Context(), kafka.Message{
+			Key:   []byte(userId.String()),
+			Value: data,
+		})
+		if err != nil {
+			log.Error().Err(err).Msg("kafka user-created message error")
+		} else {
+			log.Info().Msg("kafka message user-created sent")
+		}
 
 		token, err := CreateToken(redisDb, &userId)
 		if err != nil {

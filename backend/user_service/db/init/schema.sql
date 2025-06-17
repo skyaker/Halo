@@ -3,5 +3,5 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE users (
   id UUID PRIMARY KEY,
   username VARCHAR(255),
-  email VARCHAR(255) UNIQUE,
+  email VARCHAR(255) UNIQUE
 );

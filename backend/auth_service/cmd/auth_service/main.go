@@ -15,12 +15,26 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
+	"github.com/segmentio/kafka-go"
 )
 
+func getKafkaWriter(kafkaURL, topic string) *kafka.Writer {
+	return &kafka.Writer{
+		Addr:     kafka.TCP(kafkaURL),
+		Topic:    topic,
+		Balancer: &kafka.LeastBytes{},
+	}
+}
+
 func main() {
+	log.Info().Msg("Waiting for Kafka to be ready...")
+	time.Sleep(30 * time.Second)
+
+	// postgres
 	var db *sql.DB = dbconn.GetDbConnection()
 	defer db.Close()
 
+	// redis
 	redisDb := redis.NewClient(&redis.Options{
 		Addr:     os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
 		Password: "",
@@ -34,20 +48,21 @@ func main() {
 			Str("service", "auth service").
 			Msg("Redis connection failed")
 	}
+	log.Info().Msg("Redis connection successful")
 
 	go listenForExpiredTokens(redisDb)
 
+	// kafka
+	kafkaUrl := fmt.Sprintf("%v:%v", os.Getenv("KAFKA_HOST"), os.Getenv("KAFKA_PORT"))
+
+	writer := getKafkaWriter(kafkaUrl, "user-created")
+	log.Info().Msg("Kafka writer created")
+	defer writer.Close()
+
+	// router
 	r := chi.NewRouter()
 
-	// r.Use(cors.Handler(cors.Options{
-	// 	AllowedOrigins:   []string{"http://localhost:3000", "http://localhost:8081"},
-	// 	AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-	// 	AllowCredentials: false,
-	// AllowedHeaders: []string{"Content-Type", "Authorization"},
-	// 	MaxAge:           300,
-	// }))
-
-	r.Post("/api/auth/register", handlers.RegisterUser(db, redisDb))
+	r.Post("/api/auth/register", handlers.RegisterUser(db, redisDb, writer))
 	r.Get("/api/auth/check_token", handlers.CheckToken(db, redisDb))
 	r.Post("/api/auth/login", handlers.Login(db, redisDb))
 

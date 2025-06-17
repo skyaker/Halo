@@ -42,6 +42,13 @@ rm-network:
 	@docker network rm backend || true
 	@docker network rm frontend || true
 
+.PHONY: hard-rm-network
+hard-rm-network:
+	docker rm -f $$(docker ps -aq) || true
+	docker volume prune -f || true
+	docker network prune -f || true
+	docker network rm backend frontend || true
+
 # -------------------------------------------DATABASE-------------------------------------------
 
 .PHONY: clean-postgres
@@ -102,3 +109,15 @@ update-env:
 	    rm -f $$dir/.env; \
 	    cp .env $$dir/.env; \
 	done
+
+# -------------------------------------------KAFKA------------------------------------------- 
+
+.PHONE: reset-kafka
+reset-kafka:
+	@echo "Stopping containers..."
+	docker-compose stop kafka
+	@echo "Removing Kafka logs inside container..."
+	docker exec kafka rm -rf /tmp/kraft-combined-logs/*
+	@echo "Starting Kafka again..."
+	docker-compose start kafka
+
