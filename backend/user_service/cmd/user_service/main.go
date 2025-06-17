@@ -1,74 +1,22 @@
 package main
 
 import (
-	"context"
 	"database/sql"
-	"fmt"
 	"net/http"
-	"os"
-	"strings"
-	"time"
 	handlers "user_service/internal/handlers"
+	user_kafka "user_service/internal/kafka"
 	dbconn "user_service/internal/repository"
 
 	"github.com/rs/zerolog/log"
-	"github.com/segmentio/kafka-go"
 
 	"github.com/go-chi/chi/v5"
 )
 
-func getKafkaReader(kafkaURL, topic, groupID string) *kafka.Reader {
-	brokers := strings.Split(kafkaURL, ",")
-	return kafka.NewReader(kafka.ReaderConfig{
-		Brokers:  brokers,
-		GroupID:  groupID,
-		Topic:    topic,
-		MinBytes: 10e3, // 10KB
-		MaxBytes: 10e6, // 10MB
-	})
-}
-
-func runKafkaListener(db *sql.DB) {
-	kafkaURL := fmt.Sprintf("%v:%v", os.Getenv("KAFKA_HOST"), os.Getenv("KAFKA_PORT"))
-	topic := "user-created"
-	groupID := "1"
-
-	reader := getKafkaReader(kafkaURL, topic, groupID)
-
-	defer reader.Close()
-
-	log.Info().Msg("Start consuming kafka topic")
-
-	for {
-		m, err := reader.ReadMessage(context.Background())
-		if err != nil {
-			log.Fatal().Err(err).Msg("kafka message reading fatal")
-		}
-		messageInfo := fmt.Sprintf(
-			"message at topic:%v partition:%v offset:%v	%s = %s\n",
-			m.Topic,
-			m.Partition,
-			m.Offset,
-			string(m.Key),
-			string(m.Value),
-		)
-		log.Info().Msg(messageInfo)
-
-		err = handlers.AddUser(db, m.Value)
-		if err != nil {
-			log.Error().Msg("user-created processing failed")
-		}
-	}
-}
-
 func main() {
-	log.Info().Msg("Waiting for Kafka to be ready...")
-	time.Sleep(30 * time.Second)
-
 	var db *sql.DB = dbconn.GetDbConnection()
 	defer db.Close()
 
-	go runKafkaListener(db)
+	go user_kafka.RunKafkaListener(db)
 
 	r := chi.NewRouter()
 

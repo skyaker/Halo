@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
 	handlers "user_service/internal/handlers"
 
 	"github.com/rs/zerolog/log"
-
 	kafka "github.com/segmentio/kafka-go"
 )
 
@@ -25,7 +23,7 @@ func getKafkaReader(kafkaURL, topic, groupID string) *kafka.Reader {
 	})
 }
 
-func Listen(db *sql.DB) {
+func RunKafkaListener(db *sql.DB) {
 	kafkaURL := fmt.Sprintf("%v:%v", os.Getenv("KAFKA_HOST"), os.Getenv("KAFKA_PORT"))
 	topic := "user-created"
 	groupID := "1"

@@ -27,9 +27,6 @@ func getKafkaWriter(kafkaURL, topic string) *kafka.Writer {
 }
 
 func main() {
-	log.Info().Msg("Waiting for Kafka to be ready...")
-	time.Sleep(30 * time.Second)
-
 	// postgres
 	var db *sql.DB = dbconn.GetDbConnection()
 	defer db.Close()
