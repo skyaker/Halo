@@ -20,6 +20,10 @@ type UserRegisterResponse struct {
 	Token   string    `json:"token"`
 }
 
+type UserDeletedEvent struct {
+	Login string `json:"login"`
+}
+
 type UserLogin struct {
 	Login    string `json:"login"`
 	Password string `json:"password"`

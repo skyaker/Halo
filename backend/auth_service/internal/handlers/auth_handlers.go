@@ -28,7 +28,7 @@ func authInfoCheck(db *sql.DB, login *string, password *string) error {
 
 	exists, err := checkUserExistence(db, login)
 	if err != nil {
-		log.Error().Err(err).Str("process", "check user existence")
+		log.Error().Err(err).Msg("check user existence")
 		return fmt.Errorf("internal server error: %v", err.Error())
 	}
 	if !exists {
@@ -45,14 +45,14 @@ func authInfoCheck(db *sql.DB, login *string, password *string) error {
 			log.Error().Err(fmt.Errorf("invalid credentials"))
 			return fmt.Errorf("unauthorized: invalid credentials")
 		} else {
-			log.Error().Err(err).Str("process", "extracting user password from db")
+			log.Error().Err(err).Msg("extracting user password from db")
 			return fmt.Errorf("internal server error: %v", err.Error())
 		}
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(*password))
 	if err != nil {
-		log.Error().Err(err).Str("process", "password comparing")
+		log.Error().Err(err).Msg("password comparing")
 		return fmt.Errorf("unauthorized: invalid credentials")
 	}
 
@@ -63,7 +63,7 @@ func authInfoCheck(db *sql.DB, login *string, password *string) error {
 func addUserCredentials(db *sql.DB, user *models.UserRegisterInfo) (uuid.UUID, error) {
 	existence, err := checkUserExistence(db, &user.Login)
 	if err != nil {
-		log.Error().Err(err).Str("process", "check user existence")
+		log.Error().Err(err).Msg("check user existence")
 		return uuid.UUID{}, err
 	}
 
@@ -95,7 +95,7 @@ func RegisterUser(db *sql.DB, redisDb *redis.Client, writer *kafka.Writer) http.
 		var userData models.UserRegisterInfo
 
 		if err := json.NewDecoder(r.Body).Decode(&userData); err != nil {
-			log.Error().Err(err).Str("process", "register json decode")
+			log.Error().Err(err).Msg("register json decode")
 			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
@@ -111,7 +111,7 @@ func RegisterUser(db *sql.DB, redisDb *redis.Client, writer *kafka.Writer) http.
 				http.Error(w, "Database error", http.StatusInternalServerError)
 				return
 			} else {
-				log.Error().Err(err).Str("process", "adding user credentials")
+				log.Error().Err(err).Msg("adding user credentials")
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
@@ -167,13 +167,52 @@ func RegisterUser(db *sql.DB, redisDb *redis.Client, writer *kafka.Writer) http.
 	}
 }
 
+func DeleteUser(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var userData models.UserDeletedEvent
+
+		if err := json.NewDecoder(r.Body).Decode(&userData); err != nil {
+			log.Error().Err(err).Msg("delete request decode")
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		exists, err := checkUserExistence(db, &userData.Login)
+		if err != nil {
+			log.Error().Err(err).Msg("check user existence")
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if !exists {
+			log.Error().Err(fmt.Errorf("user not found"))
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		query := `DELETE FROM auth_credentials
+							WHERE login = $1`
+
+		_, err = db.Exec(query, userData.Login)
+		if err != nil {
+			log.Error().Err(err).Msg("deleting user credentials")
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		log.Info().Msg("User credentials deleted successfully")
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
 func Login(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var userData models.UserLogin
 		var userId uuid.UUID
 
 		if err := json.NewDecoder(r.Body).Decode(&userData); err != nil {
-			log.Error().Err(err).Str("process", "login request decode")
+			log.Error().Err(err).Msg("login request decode")
 			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
@@ -197,7 +236,7 @@ func Login(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 				log.Error().Err(err).Msg("user id was not found by login")
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			} else {
-				log.Error().Err(err).Str("process", "extracting user id by login")
+				log.Error().Err(err).Msg("extracting user id by login")
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 			}
 		}

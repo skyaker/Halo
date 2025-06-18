@@ -60,6 +60,7 @@ func main() {
 	r := chi.NewRouter()
 
 	r.Post("/api/auth/register", handlers.RegisterUser(db, redisDb, writer))
+	r.Delete("/api/auth/delete_user", handlers.DeleteUser(db, redisDb))
 	r.Get("/api/auth/check_token", handlers.CheckToken(db, redisDb))
 	r.Post("/api/auth/login", handlers.Login(db, redisDb))
 
