@@ -12,23 +12,23 @@ import (
 	kafka "github.com/segmentio/kafka-go"
 )
 
-func getKafkaReader(kafkaURL, topic, groupID string) *kafka.Reader {
+func getKafkaReader(kafkaURL string, topics []string, groupID string) *kafka.Reader {
 	brokers := strings.Split(kafkaURL, ",")
 	return kafka.NewReader(kafka.ReaderConfig{
-		Brokers:  brokers,
-		GroupID:  groupID,
-		Topic:    topic,
-		MinBytes: 10e3, // 10KB
-		MaxBytes: 10e6, // 10MB
+		Brokers:     brokers,
+		GroupID:     groupID,
+		GroupTopics: topics,
+		MinBytes:    10e3, // 10KB
+		MaxBytes:    10e6, // 10MB
 	})
 }
 
 func RunKafkaListener(db *sql.DB) {
 	kafkaURL := fmt.Sprintf("%v:%v", os.Getenv("KAFKA_HOST"), os.Getenv("KAFKA_PORT"))
-	topic := "user-created"
+	topics := []string{"user-created", "user-deleted"}
 	groupID := "1"
 
-	reader := getKafkaReader(kafkaURL, topic, groupID)
+	reader := getKafkaReader(kafkaURL, topics, groupID)
 
 	defer reader.Close()
 
@@ -39,6 +39,7 @@ func RunKafkaListener(db *sql.DB) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("kafka message reading fatal")
 		}
+
 		messageInfo := fmt.Sprintf(
 			"message at topic:%v partition:%v offset:%v	%s = %s\n",
 			m.Topic,
@@ -49,9 +50,22 @@ func RunKafkaListener(db *sql.DB) {
 		)
 		log.Info().Msg(messageInfo)
 
-		err = handlers.AddUser(db, m.Value)
-		if err != nil {
-			log.Error().Msg("user-created processing failed")
+		if m.Topic == "user-created" {
+			log.Info().Msg("user-created message received")
+
+			err = handlers.AddUser(db, m.Value)
+			if err != nil {
+				log.Error().Msg("user-created processing failed")
+			}
+		} else if m.Topic == "user-deleted" {
+			log.Info().Msg("user-deleted message received")
+
+			err = handlers.DeleteUser(db, m.Value)
+			if err != nil {
+				log.Error().Msg("user-deleted processing failed")
+			}
+		} else {
+			log.Error().Msg("topic undefined")
 		}
 	}
 }

@@ -16,7 +16,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func checkUserExistence(db *sql.DB, login *string) (bool, error) {
+func checkUserExistence(db *sql.DB, login *string) (bool, error) { // rename?
 	var exists bool
 	query := `SELECT EXISTS (SELECT 1 FROM auth_credentials WHERE login = $1)`
 	err := db.QueryRow(query, login).Scan(&exists)
@@ -167,9 +167,10 @@ func RegisterUser(db *sql.DB, redisDb *redis.Client, writer *kafka.Writer) http.
 	}
 }
 
-func DeleteUser(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
+func DeleteUser(db *sql.DB, redisDb *redis.Client, writer *kafka.Writer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var userData models.UserDeletedEvent
+		var userData models.UserDeleteInfo
+		var event models.UserDeletedEvent
 
 		if err := json.NewDecoder(r.Body).Decode(&userData); err != nil {
 			log.Error().Err(err).Msg("delete request decode")
@@ -191,13 +192,25 @@ func DeleteUser(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 		}
 
 		query := `DELETE FROM auth_credentials
-							WHERE login = $1`
+							WHERE login = $1
+							RETURNING user_id`
 
-		_, err = db.Exec(query, userData.Login)
-		if err != nil {
+		if err = db.QueryRow(query, userData.Login).Scan(&event.User_id); err != nil {
 			log.Error().Err(err).Msg("deleting user credentials")
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
+		}
+
+		data, _ := json.Marshal(event) //!!!
+
+		err = writer.WriteMessages(r.Context(), kafka.Message{
+			Key:   []byte(event.User_id.String()),
+			Value: data,
+		})
+		if err != nil {
+			log.Error().Err(err).Msg("kafka user-deleted message error")
+		} else {
+			log.Info().Msg("kafka message user-deleted sent")
 		}
 
 		log.Info().Msg("User credentials deleted successfully")

@@ -52,15 +52,20 @@ func main() {
 	// kafka
 	kafkaUrl := fmt.Sprintf("%v:%v", os.Getenv("KAFKA_HOST"), os.Getenv("KAFKA_PORT"))
 
-	writer := getKafkaWriter(kafkaUrl, "user-created")
-	log.Info().Msg("Kafka writer created")
-	defer writer.Close()
+	createdWriter := getKafkaWriter(kafkaUrl, "user-created")
+	deletedWriter := getKafkaWriter(kafkaUrl, "user-deleted")
+
+	log.Info().Msg("Kafka \"user-created\" writer created")
+	log.Info().Msg("Kafka \"user-deleted\" writer created")
+
+	defer createdWriter.Close()
+	defer deletedWriter.Close()
 
 	// router
 	r := chi.NewRouter()
 
-	r.Post("/api/auth/register", handlers.RegisterUser(db, redisDb, writer))
-	r.Delete("/api/auth/delete_user", handlers.DeleteUser(db, redisDb))
+	r.Post("/api/auth/register", handlers.RegisterUser(db, redisDb, createdWriter))
+	r.Delete("/api/auth/delete_user", handlers.DeleteUser(db, redisDb, deletedWriter))
 	r.Get("/api/auth/check_token", handlers.CheckToken(db, redisDb))
 	r.Post("/api/auth/login", handlers.Login(db, redisDb))
 

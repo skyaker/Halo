@@ -20,9 +20,29 @@ func AddUser(db *sql.DB, data []byte) error {
 
 	query := `INSERT INTO users (id, username, email)
 						VALUES ($1, $2, $3)`
-	_, err := db.Exec(query, event.UserId, event.Username, event.Email)
+	_, err := db.Exec(query, event.User_id, event.Username, event.Email)
 	if err != nil {
 		log.Error().Err(err).Msg("user info insert error")
+		return err
+	}
+
+	return nil
+}
+
+func DeleteUser(db *sql.DB, data []byte) error {
+	var event models.UserDeleteInfo
+
+	if err := json.Unmarshal(data, &event); err != nil {
+		log.Error().Err(err).Msg("user-deleted parse failed")
+		return err
+	}
+	log.Info().Msg("processing user-created")
+
+	query := `DELETE FROM users
+						WHERE id = $1`
+	_, err := db.Exec(query, event.User_id)
+	if err != nil {
+		log.Error().Err(err).Msg("user info remove error")
 		return err
 	}
 

@@ -69,6 +69,7 @@ down-kafka:
 .PHONY: kafka-topic-init
 kafka-topic-init:
 	@docker exec kafka ./opt/kafka/bin/kafka-topics.sh --create --topic user-created --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1 --if-not-exists
+	@docker exec kafka ./opt/kafka/bin/kafka-topics.sh --create --topic user-deleted --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1 --if-not-exists
 
 # -------------------------------------------DATABASE-------------------------------------------
 
