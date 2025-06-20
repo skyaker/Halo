@@ -43,6 +43,7 @@ func main() {
 	r := chi.NewRouter()
 
 	r.Post("/api/note", handlers.AddNote(db))
+	r.Delete("/api/note", handlers.DeleteNote(db))
 
 	log.Info().Msg("Note service is running")
 	err := http.ListenAndServe(":8080", r)

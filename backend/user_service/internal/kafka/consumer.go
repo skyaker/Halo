@@ -50,21 +50,22 @@ func RunKafkaListener(db *sql.DB) {
 		)
 		log.Info().Msg(messageInfo)
 
-		if m.Topic == "user-created" {
+		switch m.Topic {
+		case "user-created":
 			log.Info().Msg("user-created message received")
 
 			err = handlers.AddUser(db, m.Value)
 			if err != nil {
 				log.Error().Msg("user-created processing failed")
 			}
-		} else if m.Topic == "user-deleted" {
+		case "user-deleted":
 			log.Info().Msg("user-deleted message received")
 
 			err = handlers.DeleteUser(db, m.Value)
 			if err != nil {
 				log.Error().Msg("user-deleted processing failed")
 			}
-		} else {
+		default:
 			log.Error().Msg("topic undefined")
 		}
 	}

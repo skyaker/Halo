@@ -5,8 +5,8 @@ CREATE TABLE notes (
   user_id UUID NOT NULL,
   type_id UUID,
   content TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP,
   ended_at TIMESTAMP,
   completed BOOLEAN DEFAULT FALSE
 );
