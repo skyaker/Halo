@@ -7,6 +7,7 @@ import (
 )
 
 type NoteInfo struct {
+	Id         uuid.UUID `json:"note_id"`
 	User_id    uuid.UUID `json:"user_id"`
 	Type_id    uuid.UUID `json:"type_id"`
 	Content    string    `json:"content"`
@@ -19,3 +20,11 @@ type NoteInfo struct {
 type NoteDeleteInfo struct {
 	Note_id uuid.UUID `json:"note_id"`
 }
+
+type UserInfo struct {
+	User_id uuid.UUID `json:"user_id"`
+}
+
+// type NoteGetInfo struct {
+// 	User_id uuid.UUID ``
+// }

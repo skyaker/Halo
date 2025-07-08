@@ -13,13 +13,13 @@ import (
 func GetDbConnection() *sql.DB {
 	host, envSt := os.LookupEnv("USER_POSTGRES")
 	if !envSt {
-		log.Fatal().Msg("Note host name not found")
+		log.Fatal().Msg("User host name not found")
 		return nil
 	}
 
 	port, envSt := os.LookupEnv("USER_PG_PORT")
 	if !envSt {
-		log.Fatal().Msg("Note postgres port not found")
+		log.Fatal().Msg("User postgres port not found")
 		return nil
 	}
 
@@ -28,19 +28,19 @@ func GetDbConnection() *sql.DB {
 
 	user, envSt := os.LookupEnv("POSTGRES_USER")
 	if !envSt {
-		log.Fatal().Msg("Note postgres user not found")
+		log.Fatal().Msg("User postgres user not found")
 		return nil
 	}
 
 	password, envSt := os.LookupEnv("POSTGRES_PASSWORD")
 	if !envSt {
-		log.Fatal().Msg("Note postgres password not found")
+		log.Fatal().Msg("User postgres password not found")
 		return nil
 	}
 
 	dbname, envSt := os.LookupEnv("USER_DB")
 	if !envSt {
-		log.Fatal().Msg("Note db name not found")
+		log.Fatal().Msg("User db name not found")
 		return nil
 	}
 

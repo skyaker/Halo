@@ -12,15 +12,35 @@ import (
 )
 
 func GetDbConnection() *sql.DB {
-	host, _ := os.LookupEnv("AUTH_POSTGRES")
+	host, envSt := os.LookupEnv("AUTH_POSTGRES")
+	if !envSt {
+		log.Fatal().Msg("Auth host name not found")
+	}
 
-	port, _ := os.LookupEnv("AUTH_PG_PORT")
+	port, envSt := os.LookupEnv("AUTH_PG_PORT")
+	if !envSt {
+		log.Fatal().Msg("Auth postgres porn not found")
+	}
+
 	portInt, _ := strconv.Atoi(port)
 	portUint := uint(portInt)
 
-	user, _ := os.LookupEnv("POSTGRES_USER")
-	password, _ := os.LookupEnv("POSTGRES_PASSWORD")
-	dbname, _ := os.LookupEnv("AUTH_DB")
+	user, envSt := os.LookupEnv("POSTGRES_USER")
+	if !envSt {
+		log.Fatal().Msg("Auth postgres user not found")
+		return nil
+	}
+
+	password, envSt := os.LookupEnv("POSTGRES_PASSWORD")
+	if !envSt {
+		log.Fatal().Msg("Auth postgres password not found")
+		return nil
+	}
+
+	dbname, envSt := os.LookupEnv("AUTH_DB")
+	if !envSt {
+		log.Fatal().Msg("Auth db name not found")
+	}
 
 	psqlInfo := fmt.Sprintf(
 		"host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable",
