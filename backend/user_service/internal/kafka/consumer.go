@@ -40,16 +40,6 @@ func RunKafkaListener(db *sql.DB) {
 			log.Fatal().Err(err).Msg("kafka message reading fatal")
 		}
 
-		messageInfo := fmt.Sprintf(
-			"message at topic:%v partition:%v offset:%v	%s = %s\n",
-			m.Topic,
-			m.Partition,
-			m.Offset,
-			string(m.Key),
-			string(m.Value),
-		)
-		log.Info().Msg(messageInfo)
-
 		switch m.Topic {
 		case "user-created":
 			log.Info().Msg("user-created message received")
