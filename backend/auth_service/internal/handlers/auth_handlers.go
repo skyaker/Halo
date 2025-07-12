@@ -235,6 +235,12 @@ func Login(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 			return
 		}
 
+		if userData.Login == "" || userData.Password == "" {
+			log.Error().Err(fmt.Errorf("empty field"))
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
 		err := authInfoCheck(db, &userData.Login, &userData.Password)
 		if err != nil {
 			if strings.Contains(err.Error(), "unauthorized") {

@@ -176,3 +176,35 @@ func TestRegister_NoOptionalFields(t *testing.T) {
 
 	assertHasSessionToken(t, resp)
 }
+
+func TestRegister_EmptyJSON(t *testing.T) {
+	body := bytes.NewBufferString(`{}`)
+
+	resp, err := http.Post(
+		"http://localhost:8080/api/auth/register",
+		"application/json",
+		body,
+	)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestRegister_MissingPassword(t *testing.T) {
+	user := map[string]string{
+		"login": "missingpass_" + uuid.NewString()[:8],
+	}
+
+	body, _ := json.Marshal(user)
+
+	resp, err := http.Post(
+		"http://localhost:8080/api/auth/register",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
