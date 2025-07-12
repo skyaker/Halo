@@ -99,6 +99,11 @@ func RegisterUser(db *sql.DB, redisDb *redis.Client, writer *kafka.Writer) http.
 			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
+		if userData.Login == "" || userData.Password == "" {
+			log.Error().Err(fmt.Errorf("empty field"))
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
 
 		userId, err := addUserCredentials(db, &userData)
 		if err != nil {
