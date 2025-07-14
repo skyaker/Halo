@@ -34,7 +34,7 @@ func extractUserIdFromToken(tokenStr string) (uuid.UUID, error) {
 	})
 	if err != nil {
 		log.Error().Err(err).Msg("Token parse error")
-		return uuid.UUID{}, fmt.Errorf("bad request: token parse error")
+		return uuid.UUID{}, fmt.Errorf("unauthorized: token parse error")
 	}
 
 	claims, status := token.Claims.(jwt.MapClaims)
@@ -73,7 +73,7 @@ func CheckToken(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 
 		if user_session_token == "" {
 			log.Error().Msg("Session token is empty")
-			http.Error(w, "Bad request", http.StatusBadRequest)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
