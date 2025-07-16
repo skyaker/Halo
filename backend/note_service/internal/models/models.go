@@ -8,7 +8,6 @@ import (
 
 type NoteInfo struct {
 	Id         uuid.UUID `json:"note_id"`
-	User_id    uuid.UUID `json:"user_id"`
 	Type_id    uuid.UUID `json:"type_id"`
 	Content    string    `json:"content"`
 	Created_at time.Time `json:"created_at"`

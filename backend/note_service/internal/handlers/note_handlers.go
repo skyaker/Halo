@@ -3,6 +3,7 @@ package note_handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
@@ -20,6 +21,12 @@ const (
 	pageLimit = 10
 )
 
+type httpError struct {
+	Code  int    `json:"code"`
+	Error error  `json:"error"`
+	Msg   string `json:"msg"`
+}
+
 func checkNoteExistence(db *sql.DB, noteId uuid.UUID) (bool, error) {
 	var exists bool
 	query := `SELECT EXISTS (SELECT 1 FROM notes WHERE id = $1)`
@@ -27,8 +34,93 @@ func checkNoteExistence(db *sql.DB, noteId uuid.UUID) (bool, error) {
 	return exists, err
 }
 
+func getUserId(r *http.Request) (models.UserInfo, httpError) {
+	var userInfo models.UserInfo
+	var httpErr httpError
+
+	session_cookie, err := r.Cookie("session_token")
+	if err != nil {
+		if errors.Is(err, http.ErrNoCookie) {
+			httpErr.Code = http.StatusUnauthorized
+			httpErr.Msg = "Unauthorized"
+		} else {
+			httpErr.Code = http.StatusBadRequest
+			httpErr.Msg = "Bad request"
+		}
+		log.Error().Err(err).Msg("cookie parse error")
+		httpErr.Error = err
+		return userInfo, httpErr
+	}
+
+	user_session_token := session_cookie.Value
+
+	if user_session_token == "" {
+		log.Error().Err(fmt.Errorf("session cookie is emtpy"))
+		httpErr.Code = http.StatusBadRequest
+		httpErr.Error = fmt.Errorf("session cookie is emtpy")
+		httpErr.Msg = "Bad request"
+		return userInfo, httpErr
+	}
+
+	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	if err != nil {
+		log.Error().Err(err).Msg("cookie jar init")
+		httpErr.Code = http.StatusInternalServerError
+		httpErr.Error = err
+		httpErr.Msg = "Internal server error"
+		return userInfo, httpErr
+	}
+
+	client := http.Client{Jar: jar}
+
+	authUrl := "http://auth_service:8080/api/auth/check_token"
+
+	u, _ := url.Parse(authUrl)
+	jar.SetCookies(u, []*http.Cookie{
+		{
+			Name:  "session_token",
+			Value: session_cookie.Value,
+		},
+	})
+
+	resp, err := client.Get(authUrl)
+	if err != nil {
+		log.Error().Err(err).Msg("auth service check token")
+		httpErr.Code = http.StatusInternalServerError
+		httpErr.Error = err
+		httpErr.Msg = "Internal server error"
+		return userInfo, httpErr
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Error().Msg("auth service check token")
+		httpErr.Code = http.StatusInternalServerError
+		httpErr.Error = fmt.Errorf("auth service check token")
+		httpErr.Msg = "Internal server error"
+		return userInfo, httpErr
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+		log.Error().Err(err).Msg("user info json decode")
+		httpErr.Code = http.StatusInternalServerError
+		httpErr.Error = err
+		httpErr.Msg = "Internal server error"
+		return userInfo, httpErr
+	}
+
+	return userInfo, httpErr
+}
+
 func AddNote(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		userInfo, errInfo := getUserId(r)
+		if errInfo.Error != nil {
+			http.Error(w, errInfo.Msg, errInfo.Code)
+			return
+		}
+
 		var noteInfo models.NoteInfo
 
 		if err := json.NewDecoder(r.Body).Decode(&noteInfo); err != nil {
@@ -46,7 +138,7 @@ func AddNote(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		_, err = db.Exec(query, noteId, noteInfo.User_id, noteInfo.Type_id, noteInfo.Content)
+		_, err = db.Exec(query, noteId, userInfo.User_id, noteInfo.Type_id, noteInfo.Content)
 		if err != nil {
 			log.Error().Err(err).Msg("note creating")
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -98,59 +190,9 @@ func DeleteNote(db *sql.DB) http.HandlerFunc {
 
 func GetNote(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		session_cookie, err := r.Cookie("session_token")
-		if err != nil {
-			log.Error().Err(err).Msg("cookie parse error")
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		user_session_token := session_cookie.Value
-
-		if user_session_token == "" {
-			log.Error().Err(fmt.Errorf("session cookie is emtpy"))
-			http.Error(w, "Bad request", http.StatusBadRequest)
-		}
-
-		jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
-		if err != nil {
-			log.Error().Err(err).Msg("cookie jar init")
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		client := http.Client{Jar: jar}
-
-		authUrl := "http://auth_service:8080/api/auth/check_token"
-
-		u, _ := url.Parse(authUrl)
-		jar.SetCookies(u, []*http.Cookie{
-			{
-				Name:  "session_token",
-				Value: session_cookie.Value,
-			},
-		})
-
-		resp, err := client.Get(authUrl)
-		if err != nil {
-			log.Error().Err(err).Msg("auth service check token")
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			log.Error().Msg("auth service check token")
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		var userInfo models.UserInfo
-
-		if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
-			log.Error().Err(err).Msg("user info json decode")
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		userInfo, errInfo := getUserId(r)
+		if errInfo.Error != nil {
+			http.Error(w, errInfo.Msg, errInfo.Code)
 			return
 		}
 
@@ -190,7 +232,7 @@ func GetNote(db *sql.DB) http.HandlerFunc {
 
 			err := rows.Scan(
 				&noteInfo.Id,
-				&noteInfo.User_id,
+				&userInfo.User_id,
 				&typeId,
 				&noteInfo.Content,
 				&createdAt,
