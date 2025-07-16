@@ -155,7 +155,7 @@ func DeleteNote(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var noteInfo models.NoteDeleteInfo
 
-		_, errInfo := getUserIdFromToken(r)
+		userInfo, errInfo := getUserIdFromToken(r)
 		if errInfo.Error != nil {
 			http.Error(w, errInfo.Msg, errInfo.Code)
 			return
@@ -180,11 +180,16 @@ func DeleteNote(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		query := `DELETE FROM notes WHERE id = $1`
-		_, err = db.Exec(query, noteInfo.Note_id)
+		query := `DELETE FROM notes WHERE id = $1 and user_id = $2`
+		res, err := db.Exec(query, noteInfo.Note_id, userInfo.User_id)
 		if err != nil {
 			log.Error().Err(err).Msg("note deleting")
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		affected, _ := res.RowsAffected()
+		if affected == 0 {
+			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
 
