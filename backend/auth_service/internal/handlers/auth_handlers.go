@@ -2,6 +2,7 @@ package auth_handlers
 
 import (
 	models "auth_service/internal/models"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -16,17 +17,24 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func checkUserExistence(db *sql.DB, login *string) (bool, error) { // rename?
+func checkUserExistenceByLogin(db *sql.DB, login *string) (bool, error) {
 	var exists bool
 	query := `SELECT EXISTS (SELECT 1 FROM auth_credentials WHERE login = $1)`
 	err := db.QueryRow(query, login).Scan(&exists)
 	return exists, err
 }
 
+func checkUserExistenceById(db *sql.DB, user_id *uuid.UUID) (bool, error) {
+	var exists bool
+	query := `SELECT EXISTS (SELECT 1 FROM auth_credentials WHERE user_id = $1)`
+	err := db.QueryRow(query, user_id.String()).Scan(&exists)
+	return exists, err
+}
+
 func authInfoCheck(db *sql.DB, login *string, password *string) error {
 	var hashedPassword string
 
-	exists, err := checkUserExistence(db, login)
+	exists, err := checkUserExistenceByLogin(db, login)
 	if err != nil {
 		log.Error().Err(err).Msg("check user existence")
 		return fmt.Errorf("internal server error: %v", err.Error())
@@ -61,7 +69,7 @@ func authInfoCheck(db *sql.DB, login *string, password *string) error {
 }
 
 func addUserCredentials(db *sql.DB, user *models.UserRegisterInfo) (uuid.UUID, error) {
-	existence, err := checkUserExistence(db, &user.Login)
+	existence, err := checkUserExistenceByLogin(db, &user.Login)
 	if err != nil {
 		log.Error().Err(err).Msg("check user existence")
 		return uuid.UUID{}, err
@@ -174,16 +182,35 @@ func RegisterUser(db *sql.DB, redisDb *redis.Client, writer *kafka.Writer) http.
 
 func DeleteUser(db *sql.DB, redisDb *redis.Client, writer *kafka.Writer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var userData models.UserDeleteInfo
-		var event models.UserDeletedEvent
-
-		if err := json.NewDecoder(r.Body).Decode(&userData); err != nil {
-			log.Error().Err(err).Msg("delete request decode")
-			http.Error(w, "Bad request", http.StatusBadRequest)
+		session_cookie, err := r.Cookie("session_token")
+		if err != nil {
+			log.Error().Err(err).Msg("Getting cookie")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		exists, err := checkUserExistence(db, &userData.Login)
+		user_session_token := session_cookie.Value
+
+		if user_session_token == "" {
+			log.Error().Msg("Session token is empty")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		user_id, errInfo := extractUserIdFromToken(user_session_token)
+
+		if errInfo != nil {
+			if strings.Contains(errInfo.Error(), "unauthorized") {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			} else if strings.Contains(errInfo.Error(), "bad request") {
+				http.Error(w, "Bad request", http.StatusBadRequest)
+			} else {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		exists, err := checkUserExistenceById(db, &user_id)
 		if err != nil {
 			log.Error().Err(err).Msg("check user existence")
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -191,31 +218,46 @@ func DeleteUser(db *sql.DB, redisDb *redis.Client, writer *kafka.Writer) http.Ha
 		}
 
 		if !exists {
-			log.Error().Err(fmt.Errorf("user not found"))
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			log.Error().Err(fmt.Errorf("user not found")).Msg("user doesn't exist")
+			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
 
 		query := `DELETE FROM auth_credentials
-							WHERE login = $1
-							RETURNING user_id`
+							WHERE user_id = $1`
 
-		if err = db.QueryRow(query, userData.Login).Scan(&event.User_id); err != nil {
+		res, err := db.Exec(query, user_id)
+		if err != nil {
 			log.Error().Err(err).Msg("deleting user credentials")
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
-		data, _ := json.Marshal(event) //!!!
+		if rowsAffected, _ := res.RowsAffected(); rowsAffected == 0 {
+			log.Error().Msg("User not found")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
 
 		err = writer.WriteMessages(r.Context(), kafka.Message{
-			Key:   []byte(event.User_id.String()),
-			Value: data,
+			Key:   []byte(user_id.String()),
+			Value: []byte(user_id.String()),
 		})
 		if err != nil {
 			log.Error().Err(err).Msg("kafka user-deleted message error")
 		} else {
 			log.Info().Msg("kafka message user-deleted sent")
+		}
+
+		redisRes, err := redisDb.Del(context.Background(), fmt.Sprintf("user:%v", user_id)).Result()
+		if err != nil {
+			log.Error().Err(err).Msg("redis token removal")
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if redisRes == 0 {
+			log.Warn().Msg("Token not found")
 		}
 
 		log.Info().Msg("User credentials deleted successfully")

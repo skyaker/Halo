@@ -77,11 +77,11 @@ func CheckToken(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 			return
 		}
 
-		user_id, err := extractUserIdFromToken(user_session_token)
-		if err != nil {
-			if strings.Contains(err.Error(), "unauthorized") {
+		user_id, errInfo := extractUserIdFromToken(user_session_token)
+		if errInfo != nil {
+			if strings.Contains(errInfo.Error(), "unauthorized") {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			} else if strings.Contains(err.Error(), "bad request") {
+			} else if strings.Contains(errInfo.Error(), "bad request") {
 				http.Error(w, "Bad request", http.StatusBadRequest)
 			} else {
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
