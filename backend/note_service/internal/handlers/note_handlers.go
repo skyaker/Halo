@@ -34,7 +34,7 @@ func checkNoteExistence(db *sql.DB, noteId uuid.UUID) (bool, error) {
 	return exists, err
 }
 
-func getUserId(r *http.Request) (models.UserInfo, httpError) {
+func getUserIdFromToken(r *http.Request) (models.UserInfo, httpError) {
 	var userInfo models.UserInfo
 	var httpErr httpError
 
@@ -115,7 +115,7 @@ func getUserId(r *http.Request) (models.UserInfo, httpError) {
 
 func AddNote(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userInfo, errInfo := getUserId(r)
+		userInfo, errInfo := getUserIdFromToken(r)
 		if errInfo.Error != nil {
 			http.Error(w, errInfo.Msg, errInfo.Code)
 			return
@@ -155,6 +155,12 @@ func DeleteNote(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var noteInfo models.NoteDeleteInfo
 
+		_, errInfo := getUserIdFromToken(r)
+		if errInfo.Error != nil {
+			http.Error(w, errInfo.Msg, errInfo.Code)
+			return
+		}
+
 		if err := json.NewDecoder(r.Body).Decode(&noteInfo); err != nil {
 			log.Error().Err(err).Msg("note id json decode")
 			http.Error(w, "Bad request", http.StatusBadRequest)
@@ -190,7 +196,7 @@ func DeleteNote(db *sql.DB) http.HandlerFunc {
 
 func GetNote(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userInfo, errInfo := getUserId(r)
+		userInfo, errInfo := getUserIdFromToken(r)
 		if errInfo.Error != nil {
 			http.Error(w, errInfo.Msg, errInfo.Code)
 			return
