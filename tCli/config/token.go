@@ -37,6 +37,7 @@ func LoadToken() (string, error) {
 		logger.Logger.Error().Err(err).Msg("Token path")
 		return "", err
 	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		logger.Logger.Error().Err(err).Msg("Read token file")

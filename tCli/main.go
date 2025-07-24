@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	cmd "halo/cmd"
+	"halo/localstore"
 	"halo/logger"
 	"os"
 
@@ -24,11 +25,15 @@ func main() {
 	debug := isDebugEnabled()
 	logger.Init(debug)
 
+	localstore.GetLocalDbConnection()
+
 	cmd := &cli.Command{
-		Name:  "halo",
-		Usage: "Terminal client for habit tracking",
+		Name:                   "halo",
+		Usage:                  "Terminal client for habit tracking",
+		UseShortOptionHandling: true,
 		Commands: []*cli.Command{
 			cmd.LoginCommand,
+			cmd.AddNoteCommand,
 		},
 	}
 
