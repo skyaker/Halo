@@ -1,8 +1,6 @@
 package models
 
 import (
-	"time"
-
 	"github.com/google/uuid"
 )
 
@@ -10,9 +8,9 @@ type NoteInfo struct {
 	Id         uuid.UUID `json:"note_id"`
 	Type_id    uuid.UUID `json:"type_id"`
 	Content    string    `json:"content"`
-	Created_at time.Time `json:"created_at"`
-	Updated_at time.Time `json:"updated_at"`
-	Ended_at   time.Time `json:"ended_at"`
+	Created_at int64     `json:"created_at"`
+	Updated_at int64     `json:"updated_at"`
+	Ended_at   int64     `json:"ended_at"`
 	Completed  bool      `json:"completed"`
 }
 

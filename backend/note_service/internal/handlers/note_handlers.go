@@ -266,13 +266,13 @@ func GetNote(db *sql.DB) http.HandlerFunc {
 				}
 			}
 			if createdAt.Valid {
-				noteInfo.Created_at = createdAt.Time
+				noteInfo.Created_at = createdAt.Time.Unix()
 			}
 			if updatedAt.Valid {
-				noteInfo.Updated_at = updatedAt.Time
+				noteInfo.Updated_at = updatedAt.Time.Unix()
 			}
 			if endedAt.Valid {
-				noteInfo.Ended_at = endedAt.Time
+				noteInfo.Ended_at = endedAt.Time.Unix()
 			}
 			notes = append(notes, noteInfo)
 		}
