@@ -1,6 +1,7 @@
 package localstore
 
 import (
+	"halo/logger"
 	"halo/models"
 )
 
@@ -22,4 +23,63 @@ func AddNoteLocally(note models.NoteStruct) error {
 		return err
 	}
 	return nil
+}
+
+func GetNotesLocally(currentPage int, pageSize int) []models.NoteStruct {
+	if currentPage < 1 {
+		currentPage = 1
+	}
+	if pageSize < 1 {
+		pageSize = 10
+	}
+
+	offset := (currentPage - 1) * pageSize
+
+	query := `SELECT id, type_id, content, created_at, updated_at, ended_at, completed
+						FROM notes
+						ORDER BY created_at DESC
+						LIMIT $1 OFFSET $2;`
+	rows, err := db.Query(query, pageSize, offset)
+	if err != nil {
+		logger.Logger.Error().Err(err).Msg("note receiving")
+		return nil
+	}
+
+	defer rows.Close()
+
+	notes := make([]models.NoteStruct, 0)
+
+	for rows.Next() {
+		var noteInfo models.NoteStruct
+		var createdAt, updatedAt, endedAt int
+
+		err := rows.Scan(
+			&noteInfo.Id,
+			&noteInfo.Type_id,
+			&noteInfo.Content,
+			&createdAt,
+			&updatedAt,
+			&endedAt,
+			&noteInfo.Completed,
+		)
+		if err != nil {
+			logger.Logger.Error().Err(err).Msg("note info scan")
+			return nil
+		}
+		notes = append(notes, noteInfo)
+	}
+
+	return notes
+}
+
+func GetNumberOfNotes() (int, error) {
+	query := `SELECT COUNT(*) FROM notes`
+
+	row := db.QueryRow(query)
+	var count int
+	err := row.Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
 }

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	cmd "halo/cmd"
+	"halo/cmd"
 	"halo/localstore"
 	"halo/logger"
 	"os"
@@ -34,6 +34,8 @@ func main() {
 		Commands: []*cli.Command{
 			cmd.LoginCommand,
 			cmd.AddNoteCommand,
+			cmd.GetNotesCommand,
+			cmd.DeleteNoteCommand,
 		},
 	}
 
