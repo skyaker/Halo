@@ -26,14 +26,14 @@ func AddNoteLocally(note models.NoteStruct) error {
 }
 
 func GetNotesLocally(currentPage int, pageSize int) []models.NoteStruct {
-	if currentPage < 1 {
-		currentPage = 1
+	if currentPage < 0 {
+		currentPage = 0
 	}
 	if pageSize < 1 {
 		pageSize = 10
 	}
 
-	offset := (currentPage - 1) * pageSize
+	offset := currentPage * pageSize
 
 	query := `SELECT id, type_id, content, created_at, updated_at, ended_at, completed
 						FROM notes
@@ -70,6 +70,16 @@ func GetNotesLocally(currentPage int, pageSize int) []models.NoteStruct {
 	}
 
 	return notes
+}
+
+func DeleteNoteLocally(id string) error {
+	query := `DELETE FROM notes WHERE id = $1`
+
+	_, err := db.Exec(query, id)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func GetNumberOfNotes() (int, error) {

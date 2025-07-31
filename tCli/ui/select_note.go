@@ -13,16 +13,17 @@ import (
 )
 
 type model struct {
-	Notes     []models.NoteStruct
-	cursor    int
-	checked   map[string]bool
-	paginator paginator.Model
-	total     int
-	quitting  bool
+	Notes       []models.NoteStruct
+	PickedNotes []models.NoteStruct
+	cursor      int
+	checked     map[string]bool
+	paginator   paginator.Model
+	total       int
+	quitting    bool
 }
 
 func newModel() model {
-	notes := localstore.GetNotesLocally(1, 10)
+	notes := localstore.GetNotesLocally(0, 10)
 	numOfNotes, err := localstore.GetNumberOfNotes()
 	if err != nil {
 		logger.Logger.Error().Err(err).Msg("get number of notes")
@@ -63,12 +64,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "left", "h":
 			if m.paginator.Page > 0 {
-				m.Notes = localstore.GetNotesLocally(m.paginator.Page, m.paginator.PerPage)
+				// -1 because of lib auto page change only after switch case
+				m.Notes = localstore.GetNotesLocally(m.paginator.Page-1, m.paginator.PerPage)
 				m.cursor = 0
 			}
 		case "right", "l":
 			if m.paginator.Page < m.paginator.TotalPages-1 {
-				m.Notes = localstore.GetNotesLocally(m.paginator.Page+2, m.paginator.PerPage)
+				// +1 because of lib auto page change only after switch case
+				m.Notes = localstore.GetNotesLocally(m.paginator.Page+1, m.paginator.PerPage)
 				m.cursor = 0
 			}
 		case "up", "k":
@@ -80,20 +83,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 		case " ":
-			// start, _ := m.paginator.GetSliceBounds(len(m.Notes))
 			id := m.Notes[m.cursor].Id.String()
 			m.checked[id] = !m.checked[id]
 		case "enter":
-			var newNotes []models.NoteStruct
-			for _, t := range m.Notes {
-				id := t.Id.String()
-				if !m.checked[id] {
-					newNotes = append(newNotes, t)
+			for id := range m.checked {
+				if m.checked[id] {
+					err := localstore.DeleteNoteLocally(id)
+					if err != nil {
+						logger.Logger.Error().Err(err).Msg("local delete note")
+					}
+					m.total--
 				}
 			}
-			m.Notes = newNotes
-			m.checked = make(map[string]bool)
-			m.paginator.SetTotalPages(len(m.Notes))
+
+			m.paginator.SetTotalPages(m.total)
+			if m.paginator.Page <= m.paginator.TotalPages-1 {
+				m.Notes = localstore.GetNotesLocally(m.paginator.Page, m.paginator.PerPage)
+			} else {
+				m.paginator.OnLastPage()
+				m.Notes = localstore.GetNotesLocally(m.paginator.Page, m.paginator.PerPage)
+			}
 			m.cursor = 0
 		}
 	}
@@ -109,7 +118,7 @@ func (m model) View() string {
 
 	var b strings.Builder
 	b.WriteString(
-		"Manual (↑/↓ - navigation, Space - undo, ←/→ - page, Enter - delete, q - exit)\n\n",
+		"Manual (↑/↓ - navigation, Space - select, ←/→ - page, Enter - delete, q - exit)\n\n",
 	)
 
 	pageNotes := m.Notes
