@@ -37,7 +37,7 @@ func newModel() model {
 	p.InactiveDot = lipgloss.NewStyle().
 		Foreground(lipgloss.AdaptiveColor{Light: "250", Dark: "238"}).
 		Render("•")
-	p.SetTotalPages(len(notes))
+	p.SetTotalPages(numOfNotes)
 
 	return model{
 		Notes:     notes,
@@ -62,17 +62,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 		case "left", "h":
-			if m.paginator.Page > 1 {
-				m.paginator.PrevPage()
+			if m.paginator.Page > 0 {
 				m.Notes = localstore.GetNotesLocally(m.paginator.Page, m.paginator.PerPage)
+				m.cursor = 0
 			}
-			m.paginator.PrevPage()
-			m.cursor = 0
 		case "right", "l":
-			maxPage := (m.total + m.paginator.PerPage - 1) / m.paginator.PerPage
-			if m.paginator.Page < maxPage {
-				m.paginator.NextPage()
-				m.Notes = localstore.GetNotesLocally(m.paginator.Page, m.paginator.PerPage)
+			if m.paginator.Page < m.paginator.TotalPages-1 {
+				m.Notes = localstore.GetNotesLocally(m.paginator.Page+2, m.paginator.PerPage)
 				m.cursor = 0
 			}
 		case "up", "k":
@@ -80,15 +76,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor--
 			}
 		case "down", "j":
-			if m.cursor < m.paginator.ItemsOnPage(len(m.Notes))-1 {
+			if m.cursor < len(m.Notes)-1 {
 				m.cursor++
 			}
 		case " ":
-			start, _ := m.paginator.GetSliceBounds(len(m.Notes))
-			id := m.Notes[start+m.cursor].Id.String()
+			// start, _ := m.paginator.GetSliceBounds(len(m.Notes))
+			id := m.Notes[m.cursor].Id.String()
 			m.checked[id] = !m.checked[id]
 		case "enter":
-			// Удаление выбран
 			var newNotes []models.NoteStruct
 			for _, t := range m.Notes {
 				id := t.Id.String()
@@ -117,8 +112,7 @@ func (m model) View() string {
 		"Manual (↑/↓ - navigation, Space - undo, ←/→ - page, Enter - delete, q - exit)\n\n",
 	)
 
-	start, end := m.paginator.GetSliceBounds(len(m.Notes))
-	pageNotes := m.Notes[start:end]
+	pageNotes := m.Notes
 
 	for i, t := range pageNotes {
 		cursor := " "
