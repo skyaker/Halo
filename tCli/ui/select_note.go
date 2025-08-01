@@ -118,7 +118,7 @@ func (m model) View() string {
 
 	var b strings.Builder
 	b.WriteString(
-		"Manual (↑/↓ - navigation, Space - select, ←/→ - page, Enter - delete, q - exit)\n\n",
+		"Manual\n· ↑(k)/↓(j) - navigation\n· Space - select\n· ←(h)/→(l) - page\n· Enter - delete\n· q - exit\n\n",
 	)
 
 	pageNotes := m.Notes

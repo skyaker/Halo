@@ -8,10 +8,10 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-var DeleteNoteCommand = &cli.Command{
+var NoteListCommand = &cli.Command{
 	UseShortOptionHandling: true,
-	Name:                   "delete",
-	Usage:                  "Delete note",
+	Name:                   "list",
+	Usage:                  "note list",
 	Action: func(ctx context.Context, cmd *cli.Command) error {
 		err := ui.StartNoteSelector()
 		if err != nil {

@@ -34,8 +34,7 @@ func main() {
 		Commands: []*cli.Command{
 			cmd.LoginCommand,
 			cmd.AddNoteCommand,
-			cmd.GetNotesCommand,
-			cmd.DeleteNoteCommand,
+			cmd.NoteListCommand,
 		},
 	}
 
