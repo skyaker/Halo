@@ -9,6 +9,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"strconv"
+	"time"
 
 	models "note_service/internal/models"
 
@@ -129,8 +130,8 @@ func AddNote(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		query := `INSERT INTO notes (id, user_id, category_id, content)
-							VALUES ($1, $2, $3, $4)`
+		query := `INSERT INTO notes (id, user_id, category_id, content, created_at)
+							VALUES ($1, $2, $3, $4, $5)`
 		noteId, err := uuid.NewV7()
 		if err != nil {
 			log.Error().Err(err).Msg("new note id generation")
@@ -138,7 +139,14 @@ func AddNote(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		_, err = db.Exec(query, noteId, userInfo.User_id, noteInfo.Category_id, noteInfo.Content)
+		_, err = db.Exec(
+			query,
+			noteId,
+			userInfo.User_id,
+			noteInfo.Category_id,
+			noteInfo.Content,
+			time.Now().Unix(),
+		)
 		if err != nil {
 			log.Error().Err(err).Msg("note creating")
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -239,7 +247,7 @@ func GetNote(db *sql.DB) http.HandlerFunc {
 		for rows.Next() {
 			var noteInfo models.NoteInfo
 			var categoryId sql.NullString
-			var createdAt, updatedAt, endedAt sql.NullTime
+			var createdAt, updatedAt, endedAt sql.NullInt64
 
 			err := rows.Scan(
 				&noteInfo.Id,
@@ -265,14 +273,14 @@ func GetNote(db *sql.DB) http.HandlerFunc {
 					return
 				}
 			}
-			if createdAt.Valid {
-				noteInfo.Created_at = createdAt.Time.Unix()
+			if createdAt.Valid && createdAt.Int64 != 0 {
+				noteInfo.Created_at = createdAt.Int64
 			}
-			if updatedAt.Valid {
-				noteInfo.Updated_at = updatedAt.Time.Unix()
+			if updatedAt.Valid && updatedAt.Int64 != 0 {
+				noteInfo.Updated_at = updatedAt.Int64
 			}
-			if endedAt.Valid {
-				noteInfo.Ended_at = endedAt.Time.Unix()
+			if endedAt.Valid && endedAt.Int64 != 0 {
+				noteInfo.Ended_at = endedAt.Int64
 			}
 			notes = append(notes, noteInfo)
 		}
