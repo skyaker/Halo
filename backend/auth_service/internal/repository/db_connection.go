@@ -19,7 +19,7 @@ func GetDbConnection() *sql.DB {
 
 	port, envSt := os.LookupEnv("AUTH_PG_PORT")
 	if !envSt {
-		log.Fatal().Msg("Auth postgres porn not found")
+		log.Fatal().Msg("Auth postgres port not found")
 	}
 
 	portInt, _ := strconv.Atoi(port)

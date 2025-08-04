@@ -37,10 +37,10 @@ func TestDeleteNote_Success(t *testing.T) {
 	}
 	require.NotEmpty(t, token)
 
-	typeID := uuid.New()
+	categoryID := uuid.New()
 	note := map[string]interface{}{
-		"type_id": typeID.String(),
-		"content": "Note to be deleted",
+		"category_id": categoryID.String(),
+		"content":     "Note to be deleted",
 	}
 	noteBody, _ := json.Marshal(note)
 
@@ -276,8 +276,8 @@ func TestDeleteNote_ForeignUser(t *testing.T) {
 	require.NotEmpty(t, tokenA)
 
 	note := map[string]interface{}{
-		"type_id": uuid.New().String(),
-		"content": "Private note",
+		"category_id": uuid.New().String(),
+		"content":     "Private note",
 	}
 	noteBody, _ := json.Marshal(note)
 

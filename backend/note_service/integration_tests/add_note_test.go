@@ -39,8 +39,8 @@ func TestAddNote_Success(t *testing.T) {
 	require.NotEmpty(t, sessionToken, "session_token not found after login")
 
 	note := map[string]interface{}{
-		"type_id": uuid.New().String(),
-		"content": "Test note from login-based test",
+		"category_id": uuid.New().String(),
+		"content":     "Test note from login-based test",
 	}
 	noteBody, _ := json.Marshal(note)
 
@@ -86,7 +86,7 @@ func TestAddNote_InvalidJSON(t *testing.T) {
 	}
 	require.NotEmpty(t, sessionToken)
 
-	invalidJSON := `{"type_id": "invalid", "content": "broken"`
+	invalidJSON := `{"category_id": "invalid", "content": "broken"`
 
 	req, err := http.NewRequest(
 		"POST",
@@ -110,8 +110,8 @@ func TestAddNote_InvalidJSON(t *testing.T) {
 
 func TestAddNote_MissingToken(t *testing.T) {
 	note := map[string]interface{}{
-		"type_id": uuid.New().String(),
-		"content": "Note without token",
+		"category_id": uuid.New().String(),
+		"content":     "Note without token",
 	}
 	body, err := json.Marshal(note)
 	require.NoError(t, err)

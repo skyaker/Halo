@@ -57,6 +57,20 @@ services:
     tty: true
     networks: [backend]
 
+  category_postgres:
+    image: postgres:17
+    container_name: ${CATEGORY_POSTGRES}
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${CATEGORY_DB}
+    ports:
+      - "5436:5432"
+    volumes:
+      - ./category_service/db/init:/docker-entrypoint-initdb.d
+    networks: [backend]
+
 networks:
   backend:
     driver: bridge

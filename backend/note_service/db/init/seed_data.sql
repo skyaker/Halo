@@ -1,4 +1,4 @@
-INSERT INTO notes (id, user_id, type_id, content, created_at, updated_at, ended_at, completed) VALUES
+INSERT INTO notes (id, user_id, category_id, content, created_at, updated_at, ended_at, completed) VALUES
 (
   '11111111-1111-1111-1111-111111111111',
   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',

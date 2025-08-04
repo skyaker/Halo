@@ -51,6 +51,18 @@ services:
     restart: always
     networks: [backend]
 
+  category_service:
+    container_name: category_service
+    ports: 
+      - "8080"
+    build:
+      context: ./category_service
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    restart: always
+    networks: [backend]
+
 networks:
   backend:
     driver: bridge

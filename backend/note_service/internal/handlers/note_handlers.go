@@ -129,7 +129,7 @@ func AddNote(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		query := `INSERT INTO notes (id, user_id, type_id, content)
+		query := `INSERT INTO notes (id, user_id, category_id, content)
 							VALUES ($1, $2, $3, $4)`
 		noteId, err := uuid.NewV7()
 		if err != nil {
@@ -138,7 +138,7 @@ func AddNote(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		_, err = db.Exec(query, noteId, userInfo.User_id, noteInfo.Type_id, noteInfo.Content)
+		_, err = db.Exec(query, noteId, userInfo.User_id, noteInfo.Category_id, noteInfo.Content)
 		if err != nil {
 			log.Error().Err(err).Msg("note creating")
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -219,7 +219,7 @@ func GetNote(db *sql.DB) http.HandlerFunc {
 
 		offset := (page - 1) * pageLimit
 
-		query := `SELECT id, user_id, type_id, content, created_at, updated_at, ended_at, completed
+		query := `SELECT id, user_id, category_id, content, created_at, updated_at, ended_at, completed
 							FROM notes
 							WHERE user_id = $1
 							ORDER BY created_at DESC
@@ -238,13 +238,13 @@ func GetNote(db *sql.DB) http.HandlerFunc {
 
 		for rows.Next() {
 			var noteInfo models.NoteInfo
-			var typeId sql.NullString
+			var categoryId sql.NullString
 			var createdAt, updatedAt, endedAt sql.NullTime
 
 			err := rows.Scan(
 				&noteInfo.Id,
 				&userInfo.User_id,
-				&typeId,
+				&categoryId,
 				&noteInfo.Content,
 				&createdAt,
 				&updatedAt,
@@ -257,10 +257,10 @@ func GetNote(db *sql.DB) http.HandlerFunc {
 				return
 			}
 
-			if typeId.Valid {
-				noteInfo.Type_id, err = uuid.Parse(typeId.String)
+			if categoryId.Valid {
+				noteInfo.Category_id, err = uuid.Parse(categoryId.String)
 				if err != nil {
-					log.Error().Err(err).Msg("type id parse")
+					log.Error().Err(err).Msg("category id parse")
 					http.Error(w, "Internal server error", http.StatusInternalServerError)
 					return
 				}

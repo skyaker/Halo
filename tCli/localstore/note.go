@@ -6,13 +6,13 @@ import (
 )
 
 func AddNoteLocally(note models.NoteStruct) error {
-	query := `INSERT INTO notes (id, type_id, content, created_at, updated_at, ended_at, completed) 
+	query := `INSERT INTO notes (id, category_id, content, created_at, updated_at, ended_at, completed) 
 						VALUES ($1, $2, $3, $4, $5, $6, $7);`
 
 	_, err := db.Exec(
 		query,
 		note.Id,
-		note.Type_id,
+		note.Category_id,
 		note.Content,
 		note.Created_at,
 		note.Updated_at,
@@ -35,7 +35,7 @@ func GetNotesLocally(currentPage int, pageSize int) []models.NoteStruct {
 
 	offset := currentPage * pageSize
 
-	query := `SELECT id, type_id, content, created_at, updated_at, ended_at, completed
+	query := `SELECT id, category_id, content, created_at, updated_at, ended_at, completed
 						FROM notes
 						ORDER BY created_at DESC
 						LIMIT $1 OFFSET $2;`
@@ -55,7 +55,7 @@ func GetNotesLocally(currentPage int, pageSize int) []models.NoteStruct {
 
 		err := rows.Scan(
 			&noteInfo.Id,
-			&noteInfo.Type_id,
+			&noteInfo.Category_id,
 			&noteInfo.Content,
 			&createdAt,
 			&updatedAt,

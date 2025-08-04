@@ -34,7 +34,7 @@ func GetLocalDbConnection() {
 	schema := `
 	CREATE TABLE IF NOT EXISTS notes (
   	id UUID PRIMARY KEY,
-  	type_id UUID,
+  	category_id UUID,
   	content TEXT NOT NULL,
   	created_at BIGINT,
   	updated_at BIGINT,
