@@ -24,10 +24,10 @@ type httpError struct {
 	Msg   string `json:"msg"`
 }
 
-func checkCategoryExistence(db *sql.DB, categoryId uuid.UUID) (bool, error) {
+func checkCategoryExistence(db *sql.DB, userId uuid.UUID, name string) (bool, error) {
 	var exists bool
-	query := `SELECT EXISTS (SELECT 1 FROM categories WHERE id = $1)`
-	err := db.QueryRow(query, categoryId).Scan(&exists)
+	query := `SELECT EXISTS (SELECT 1 FROM categories WHERE user_id = $1 AND name = $2)`
+	err := db.QueryRow(query, userId, name).Scan(&exists)
 	return exists, err
 }
 
@@ -123,6 +123,25 @@ func AddCategory(db *sql.DB) http.HandlerFunc {
 		if err := json.NewDecoder(r.Body).Decode(&categoryInfo); err != nil {
 			log.Error().Err(err).Msg("category info json decode")
 			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		if categoryInfo.Name == "" {
+			log.Error().Err(fmt.Errorf("category name is empty"))
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		exists, err := checkCategoryExistence(db, userInfo.User_id, categoryInfo.Name)
+		if err != nil {
+			log.Error().Err(err).Msg("check category existence")
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if exists {
+			log.Error().Err(fmt.Errorf("category name already exists"))
+			http.Error(w, "Conflict", http.StatusConflict)
 			return
 		}
 
