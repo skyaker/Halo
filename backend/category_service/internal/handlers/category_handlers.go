@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +17,10 @@ import (
 	"golang.org/x/net/publicsuffix"
 
 	models "category_service/internal/models"
+)
+
+const (
+	pageLimit = 10
 )
 
 type httpError struct {
@@ -82,10 +87,17 @@ func getUserIdFromToken(r *http.Request) (models.UserInfo, httpError) {
 
 	resp, err := client.Get(authUrl)
 	if err != nil {
-		log.Error().Err(err).Msg("auth service check token")
+		log.Error().Msg("check token in id parse from token")
 		httpErr.Code = http.StatusInternalServerError
 		httpErr.Error = err
 		httpErr.Msg = "Internal server error"
+		return userInfo, httpErr
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		log.Error().Msg("check token in id parse from token")
+		httpErr.Code = resp.StatusCode
+		httpErr.Error = fmt.Errorf("check token error")
 		return userInfo, httpErr
 	}
 
@@ -160,5 +172,130 @@ func AddCategory(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
+	}
+}
+
+func DeleteCategory(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userInfo, errInfo := getUserIdFromToken(r)
+		if errInfo.Error != nil {
+			http.Error(w, errInfo.Msg, errInfo.Code)
+			return
+		}
+
+		var categoryInfo models.CategoryInfo
+
+		if err := json.NewDecoder(r.Body).Decode(&categoryInfo); err != nil {
+			log.Error().Err(err).Msg("category id json decode")
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		exists, err := checkCategoryExistence(db, userInfo.User_id, categoryInfo.Name)
+		if err != nil {
+			log.Error().Err(err).Msg("check category existence")
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if !exists {
+			log.Error().Err(fmt.Errorf("category not found"))
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		query := `DELETE FROM categories WHERE id = $1 and user_id = $2`
+		res, err := db.Exec(query, categoryInfo.Id, userInfo.User_id)
+		if err != nil {
+			log.Error().Err(err).Msg("category deleting")
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		affected, _ := res.RowsAffected()
+		if affected == 0 {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		log.Info().Msg("Category deleted successfully")
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func GetCategory(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userInfo, errInfo := getUserIdFromToken(r)
+		if errInfo.Error != nil {
+			http.Error(w, errInfo.Msg, errInfo.Code)
+			return
+		}
+
+		pageStr := r.URL.Query().Get("page")
+		page := 1
+
+		p, err := strconv.Atoi(pageStr)
+		if err != nil || p < 1 {
+			log.Error().Err(err).Msg("page parse")
+		} else {
+			page = p
+		}
+
+		offset := (page - 1) * pageLimit
+
+		query := `SELECT id, user_id, name, created_at, updated_at
+							FROM categories
+							WHERE user_id = $1
+							ORDER BY created_at DESC
+							LIMIT $2 OFFSET $3`
+		rows, err := db.Query(query, userInfo.User_id, pageLimit, offset)
+		if err != nil {
+			log.Error().Err(err).Msg("category receiving")
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		defer rows.Close()
+
+		var categories []models.CategoryInfo
+
+		for rows.Next() {
+			var categoryInfo models.CategoryInfo
+			var createdAt, updatedAt sql.NullInt64
+
+			err := rows.Scan(
+				&categoryInfo.Id,
+				&userInfo.User_id,
+				&categoryInfo.Name,
+				&createdAt,
+				&updatedAt,
+			)
+			if err != nil {
+				log.Error().Err(err).Msg("category info scan")
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			if createdAt.Valid && createdAt.Int64 != 0 {
+				categoryInfo.Created_at = createdAt.Int64
+			}
+			if updatedAt.Valid && updatedAt.Int64 != 0 {
+				categoryInfo.Updated_at = updatedAt.Int64
+			}
+			categories = append(categories, categoryInfo)
+		}
+
+		if err := rows.Err(); err != nil {
+			log.Error().Err(err).Msg("category receiving")
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+
+		if err := json.NewEncoder(w).Encode(categories); err != nil {
+			log.Error().Err(err).Msg("failed to write json response")
+		}
+		return
 	}
 }

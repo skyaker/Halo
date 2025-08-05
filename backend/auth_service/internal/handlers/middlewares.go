@@ -111,8 +111,6 @@ func CheckToken(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
 			return
 		}
 
-		// fmt.Print(tokens)
-
 		tokenFound := slices.Contains(tokens, user_session_token)
 
 		if !tokenFound {

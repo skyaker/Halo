@@ -17,6 +17,8 @@ func main() {
 	r := chi.NewRouter()
 
 	r.Post("/api/category", handlers.AddCategory(db))
+	r.Delete("/api/category", handlers.DeleteCategory(db))
+	r.Get("/api/category", handlers.GetCategory(db))
 
 	log.Info().Msg("category service is running")
 	err := http.ListenAndServe(":8080", r)
