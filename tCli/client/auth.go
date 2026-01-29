@@ -51,3 +51,42 @@ func Login(login, password string) (string, error) {
 
 	return session_token, nil
 }
+
+func Register(login, password, username, email string) (string, error) {
+	data := models.RegisterRequest{
+		Login:    login,
+		Password: password,
+		Username: username,
+		Email:    email,
+	}
+
+	body, _ := json.Marshal(data)
+
+	resp, err := http.Post(
+		"http://localhost:8080/api/auth/register",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	if err != nil {
+		logger.Logger.Error().Err(err).Msg("Client register request")
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		logger.Logger.Error().
+			Err(fmt.Errorf("status %d", resp.StatusCode)).
+			Msg("Client register status code")
+		return "", fmt.Errorf("status %d", resp.StatusCode)
+	}
+
+	var session_token string
+	cookies := resp.Cookies()
+	for _, cookie := range cookies {
+		if cookie.Name == "session_token" {
+			session_token = cookie.Value
+		}
+	}
+
+	return session_token, nil
+}

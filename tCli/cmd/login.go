@@ -4,14 +4,15 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	client "halo/client"
-	config "halo/config"
-	"halo/logger"
 	"os"
 	"strings"
 
 	"github.com/urfave/cli/v3"
 	"golang.org/x/term"
+
+	client "halo/client"
+	config "halo/config"
+	logger "halo/logger"
 )
 
 var LoginCommand = &cli.Command{

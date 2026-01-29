@@ -35,6 +35,7 @@ func main() {
 			cmd.LoginCommand,
 			cmd.AddNoteCommand,
 			cmd.NoteListCommand,
+			cmd.RegisterCommand,
 		},
 	}
 

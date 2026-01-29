@@ -17,87 +17,86 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func checkUserExistenceByLogin(db *sql.DB, login *string) (bool, error) {
-	var exists bool
-	query := `SELECT EXISTS (SELECT 1 FROM auth_credentials WHERE login = $1)`
-	err := db.QueryRow(query, login).Scan(&exists)
-	return exists, err
-}
+func Login(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var userData models.UserLogin
+		var userId uuid.UUID
 
-func checkUserExistenceById(db *sql.DB, user_id *uuid.UUID) (bool, error) {
-	var exists bool
-	query := `SELECT EXISTS (SELECT 1 FROM auth_credentials WHERE user_id = $1)`
-	err := db.QueryRow(query, user_id.String()).Scan(&exists)
-	return exists, err
-}
-
-func authInfoCheck(db *sql.DB, login *string, password *string) error {
-	var hashedPassword string
-
-	exists, err := checkUserExistenceByLogin(db, login)
-	if err != nil {
-		log.Error().Err(err).Msg("check user existence")
-		return fmt.Errorf("internal server error: %v", err.Error())
-	}
-	if !exists {
-		log.Error().Err(fmt.Errorf("invalid credentials"))
-		return fmt.Errorf("unauthorized: invalid credentials")
-	}
-
-	query := `SELECT password_hash
-						FROM auth_credentials
-						WHERE login = $1`
-
-	if err = db.QueryRow(query, login).Scan(&hashedPassword); err != nil {
-		if err == sql.ErrNoRows {
-			log.Error().Err(fmt.Errorf("invalid credentials"))
-			return fmt.Errorf("unauthorized: invalid credentials")
-		} else {
-			log.Error().Err(err).Msg("extracting user password from db")
-			return fmt.Errorf("internal server error: %v", err.Error())
+		if err := json.NewDecoder(r.Body).Decode(&userData); err != nil {
+			log.Error().Err(err).Msg("login request decode")
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
 		}
-	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(*password))
-	if err != nil {
-		log.Error().Err(err).Msg("password comparing")
-		return fmt.Errorf("unauthorized: invalid credentials")
-	}
+		if userData.Login == "" || userData.Password == "" {
+			log.Error().Err(fmt.Errorf("empty field"))
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
 
-	log.Info().Msg("credentials check passed")
-	return nil
+		err := authInfoCheck(db, &userData.Login, &userData.Password)
+		if err != nil {
+			if strings.Contains(err.Error(), "unauthorized") {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			} else {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		query := `SELECT user_id
+							FROM auth_credentials
+							WHERE login = $1`
+
+		if err = db.QueryRow(query, userData.Login).Scan(&userId); err != nil {
+			if err == sql.ErrNoRows {
+				log.Error().Err(err).Msg("user id was not found by login")
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			} else {
+				log.Error().Err(err).Msg("extracting user id by login")
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+		}
+
+		token, err := CreateToken(redisDb, &userId)
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session_token",
+			Value:    token,
+			HttpOnly: true,
+			Secure:   false,
+			SameSite: http.SameSiteLaxMode,
+			Path:     "/",
+			Expires:  time.Now().Add(6 * 30 * 24 * time.Hour),
+		})
+
+		w.WriteHeader(http.StatusOK)
+	}
 }
 
-func addUserCredentials(db *sql.DB, user *models.UserRegisterInfo) (uuid.UUID, error) {
-	existence, err := checkUserExistenceByLogin(db, &user.Login)
-	if err != nil {
-		log.Error().Err(err).Msg("check user existence")
-		return uuid.UUID{}, err
-	}
-
-	if existence {
-		return uuid.UUID{}, fmt.Errorf("user already exists")
-	}
-
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return uuid.UUID{}, fmt.Errorf("error hashing password")
-	}
-
-	query := `INSERT INTO auth_credentials (user_id, login, password_hash, created_at) VALUES ($1, $2, $3, $4)`
-	userId, err := uuid.NewV7()
-	if err != nil {
-		return uuid.UUID{}, err
-	}
-
-	_, err = db.Exec(query, userId, user.Login, hashedPassword, time.Now().Unix())
-	if err != nil {
-		return uuid.UUID{}, err
-	}
-
-	return userId, nil
-}
-
+// RegisterUser handles the user registration flow.
+//
+// Workflow:
+//  1. Decodes and validates the request body (Login and Password are required).
+//  2. Persists user credentials to the database.
+//  3. Publishes a "user-created" event to Kafka for downstream processing (e.g., profile creation).
+//  4. Generates a session token via Redis.
+//  5. Sets a "session_token" HTTP-only cookie and returns 200 OK.
+//
+// Validation & Constraints:
+//   - Returns 400 Bad Request if Login/Password are empty or JSON is malformed.
+//   - Returns 400 Bad Request if the user already exists.
+//   - Username and Email are optional and included in the Kafka event if provided.
+//
+// Side Effects:
+//   - Database: Creates a new record in the credentials table.
+//   - Kafka: Writes a message with the user ID and optional profile info.
+//   - Redis: Stores a new session token.
+//   - Client: Sets a long-lived (approx. 6 months) session cookie.
 func RegisterUser(db *sql.DB, redisDb *redis.Client, writer *kafka.Writer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var userData models.UserRegisterInfo
@@ -266,63 +265,83 @@ func DeleteUser(db *sql.DB, redisDb *redis.Client, writer *kafka.Writer) http.Ha
 	}
 }
 
-func Login(db *sql.DB, redisDb *redis.Client) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var userData models.UserLogin
-		var userId uuid.UUID
+func checkUserExistenceByLogin(db *sql.DB, login *string) (bool, error) {
+	var exists bool
+	query := `SELECT EXISTS (SELECT 1 FROM auth_credentials WHERE login = $1)`
+	err := db.QueryRow(query, login).Scan(&exists)
+	return exists, err
+}
 
-		if err := json.NewDecoder(r.Body).Decode(&userData); err != nil {
-			log.Error().Err(err).Msg("login request decode")
-			http.Error(w, "Bad request", http.StatusBadRequest)
-			return
-		}
+func checkUserExistenceById(db *sql.DB, user_id *uuid.UUID) (bool, error) {
+	var exists bool
+	query := `SELECT EXISTS (SELECT 1 FROM auth_credentials WHERE user_id = $1)`
+	err := db.QueryRow(query, user_id.String()).Scan(&exists)
+	return exists, err
+}
 
-		if userData.Login == "" || userData.Password == "" {
-			log.Error().Err(fmt.Errorf("empty field"))
-			http.Error(w, "Bad request", http.StatusBadRequest)
-			return
-		}
+func authInfoCheck(db *sql.DB, login *string, password *string) error {
+	var hashedPassword string
 
-		err := authInfoCheck(db, &userData.Login, &userData.Password)
-		if err != nil {
-			if strings.Contains(err.Error(), "unauthorized") {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			} else {
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-			}
-			return
-		}
-
-		query := `SELECT user_id
-							FROM auth_credentials
-							WHERE login = $1`
-
-		if err = db.QueryRow(query, userData.Login).Scan(&userId); err != nil {
-			if err == sql.ErrNoRows {
-				log.Error().Err(err).Msg("user id was not found by login")
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			} else {
-				log.Error().Err(err).Msg("extracting user id by login")
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-			}
-		}
-
-		token, err := CreateToken(redisDb, &userId)
-		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		http.SetCookie(w, &http.Cookie{
-			Name:     "session_token",
-			Value:    token,
-			HttpOnly: true,
-			Secure:   false,
-			SameSite: http.SameSiteLaxMode,
-			Path:     "/",
-			Expires:  time.Now().Add(6 * 30 * 24 * time.Hour),
-		})
-
-		w.WriteHeader(http.StatusOK)
+	exists, err := checkUserExistenceByLogin(db, login)
+	if err != nil {
+		log.Error().Err(err).Msg("check user existence")
+		return fmt.Errorf("internal server error: %v", err.Error())
 	}
+	if !exists {
+		log.Error().Err(fmt.Errorf("invalid credentials"))
+		return fmt.Errorf("unauthorized: invalid credentials")
+	}
+
+	query := `SELECT password_hash
+						FROM auth_credentials
+						WHERE login = $1`
+
+	if err = db.QueryRow(query, login).Scan(&hashedPassword); err != nil {
+		if err == sql.ErrNoRows {
+			log.Error().Err(fmt.Errorf("invalid credentials"))
+			return fmt.Errorf("unauthorized: invalid credentials")
+		} else {
+			log.Error().Err(err).Msg("extracting user password from db")
+			return fmt.Errorf("internal server error: %v", err.Error())
+		}
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(*password))
+	if err != nil {
+		log.Error().Err(err).Msg("password comparing")
+		return fmt.Errorf("unauthorized: invalid credentials")
+	}
+
+	log.Info().Msg("credentials check passed")
+	return nil
+}
+
+func addUserCredentials(db *sql.DB, user *models.UserRegisterInfo) (uuid.UUID, error) {
+	existence, err := checkUserExistenceByLogin(db, &user.Login)
+	if err != nil {
+		log.Error().Err(err).Msg("check user existence")
+		return uuid.UUID{}, err
+	}
+
+	if existence {
+		return uuid.UUID{}, fmt.Errorf("user already exists")
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return uuid.UUID{}, fmt.Errorf("error hashing password")
+	}
+
+	query := `INSERT INTO auth_credentials (user_id, login, password_hash, created_at) VALUES ($1, $2, $3, $4)`
+	userId, err := uuid.NewV7()
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+
+	_, err = db.Exec(query, userId, user.Login, hashedPassword, time.Now().Unix())
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+
+	return userId, nil
 }
