@@ -10,6 +10,7 @@ import (
 
 	handlers "auth_service/internal/handlers"
 	dbconn "auth_service/internal/repository"
+	service "auth_service/internal/service"
 
 	"github.com/go-chi/chi/v5"
 	_ "github.com/lib/pq"
@@ -17,14 +18,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/kafka-go"
 )
-
-func getKafkaWriter(kafkaURL, topic string) *kafka.Writer {
-	return &kafka.Writer{
-		Addr:     kafka.TCP(kafkaURL),
-		Topic:    topic,
-		Balancer: &kafka.LeastBytes{},
-	}
-}
 
 func main() {
 	// postgres
@@ -51,23 +44,27 @@ func main() {
 
 	// kafka
 	kafkaUrl := fmt.Sprintf("%v:%v", os.Getenv("KAFKA_HOST"), os.Getenv("KAFKA_PORT"))
+	writer := getKafkaWriter(kafkaUrl)
 
-	createdWriter := getKafkaWriter(kafkaUrl, "user-created")
-	deletedWriter := getKafkaWriter(kafkaUrl, "user-deleted")
+	log.Info().Msg("Kafka writer created")
 
-	log.Info().Msg("Kafka \"user-created\" writer created")
-	log.Info().Msg("Kafka \"user-deleted\" writer created")
+	defer writer.Close()
 
-	defer createdWriter.Close()
-	defer deletedWriter.Close()
+	key, status := os.LookupEnv("TOKEN_SECRET_KEY")
+	if !status {
+		log.Fatal().Msg("TOKEN_SECRET_KEY environment variable is not set")
+	}
 
 	// router
 	r := chi.NewRouter()
 
-	r.Post("/api/auth/register", handlers.RegisterUser(db, redisDb, createdWriter))
-	r.Delete("/api/auth/delete_user", handlers.DeleteUser(db, redisDb, deletedWriter))
-	r.Get("/api/auth/check_token", handlers.CheckToken(db, redisDb))
-	r.Post("/api/auth/login", handlers.Login(db, redisDb))
+	authService := service.NewAuthService(db, redisDb, writer, key)
+	authHandler := handlers.NewAuthHandler(authService)
+
+	r.Post("/api/auth/register", authHandler.HandleRegister())
+	// r.Delete("/api/auth/delete_user", authHandler.HandleDelete())
+	// r.Get("/api/auth/check_token", authHandler.CheckToken())
+	// r.Post("/api/auth/login", authHandler.Login())
 
 	log.Info().Msg("Auth server is running")
 	err = http.ListenAndServe(":8080", r)
@@ -76,6 +73,13 @@ func main() {
 			Err(err).
 			Str("service", "auth service").
 			Msg("Server start failed")
+	}
+}
+
+func getKafkaWriter(kafkaURL string) *kafka.Writer {
+	return &kafka.Writer{
+		Addr:     kafka.TCP(kafkaURL),
+		Balancer: &kafka.LeastBytes{},
 	}
 }
 

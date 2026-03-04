@@ -1,4 +1,4 @@
-package connection
+package repository
 
 import (
 	"database/sql"
