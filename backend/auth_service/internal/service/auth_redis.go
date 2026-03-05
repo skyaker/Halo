@@ -1,6 +1,7 @@
 package auth_service
 
 import (
+	models "auth_service/internal/models"
 	"context"
 	"fmt"
 	"time"
@@ -20,7 +21,7 @@ func (s *authService) createToken(ctx context.Context, userId uuid.UUID) (string
 
 	signed, err := token.SignedString([]byte(s.secretKey))
 	if err != nil {
-		return "", fmt.Errorf("service: token creation failed: %w", err)
+		return "", fmt.Errorf("token creation failed: %w", err)
 	}
 
 	session_key := fmt.Sprintf("user:%v", userId)
@@ -30,8 +31,45 @@ func (s *authService) createToken(ctx context.Context, userId uuid.UUID) (string
 		Member: signed,
 	}).Result()
 	if err != nil {
-		return "", fmt.Errorf("service: token insertion failed: %w", err)
+		return "", fmt.Errorf("token insertion failed: %w", err)
 	}
 
 	return signed, nil
+}
+
+func (s *authService) ParseToken(tokenStr string) (uuid.UUID, error) {
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("jwt signing method not supported")
+		}
+		return []byte(s.secretKey), nil
+	})
+	if err != nil {
+		return uuid.UUID{}, models.ErrInvalidToken
+	}
+
+	claims, status := token.Claims.(jwt.MapClaims)
+	if !status || !token.Valid {
+		return uuid.UUID{}, models.ErrInvalidToken
+	}
+
+	userIdRaw, ok := claims["user_id"].(string)
+	if !ok {
+		return uuid.UUID{}, models.ErrInvalidToken
+	}
+
+	userId, err := uuid.Parse(userIdRaw)
+	if err != nil {
+		return uuid.UUID{}, models.ErrInvalidToken
+	}
+
+	return userId, nil
+}
+
+func (s *authService) deleteTokensByUserId(ctx context.Context, userId uuid.UUID) error {
+	_, err := s.redisDb.Del(ctx, fmt.Sprintf("user:%v", userId)).Result()
+	if err != nil {
+		return fmt.Errorf("redis token removal failed: %w", err)
+	}
+	return nil
 }

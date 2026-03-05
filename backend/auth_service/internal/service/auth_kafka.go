@@ -42,3 +42,18 @@ func (s *authService) sentUserCreatedEvent(
 
 	return nil
 }
+
+func (s *authService) sentUserDeletedEvent(
+	ctx context.Context,
+	userId uuid.UUID,
+) error {
+	err := s.writer.WriteMessages(ctx, kafka.Message{
+		Topic: "user-deleted",
+		Key:   []byte(userId.String()),
+		Value: []byte(userId.String()),
+	})
+	if err != nil {
+		return fmt.Errorf("kafka user-deleted message error: %w", err)
+	}
+	return nil
+}

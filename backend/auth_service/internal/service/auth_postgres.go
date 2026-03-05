@@ -46,6 +46,25 @@ func addUserCredentials(
 	return userId, nil
 }
 
+func deleteUserCredentials(ctx context.Context, db *sql.DB, userId uuid.UUID) error {
+	query := `DELETE FROM auth_credentials WHERE user_id = $1`
+
+	res, err := db.ExecContext(ctx, query, userId.String())
+	if err != nil {
+		return fmt.Errorf("deleting user credentials failed: %w", err)
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return models.ErrNotFound
+	}
+
+	return nil
+}
+
 func checkUserExistenceByLogin(ctx context.Context, db *sql.DB, login *string) (bool, error) {
 	var exists bool
 	query := `SELECT EXISTS (SELECT 1 FROM auth_credentials WHERE login = $1)`

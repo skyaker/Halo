@@ -9,5 +9,5 @@ var (
 	ErrInvalidRequest = errors.New("invalid request parameters")
 
 	ErrIncorrectPassword = errors.New("incorrect password")
-	ErrUserBlocked       = errors.New("user is blocked")
+	ErrInvalidToken      = errors.New("invalid token")
 )

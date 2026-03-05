@@ -50,6 +50,7 @@ func main() {
 
 	defer writer.Close()
 
+	// token secret key
 	key, status := os.LookupEnv("TOKEN_SECRET_KEY")
 	if !status {
 		log.Fatal().Msg("TOKEN_SECRET_KEY environment variable is not set")
@@ -62,7 +63,7 @@ func main() {
 	authHandler := handlers.NewAuthHandler(authService)
 
 	r.Post("/api/auth/register", authHandler.HandleRegister())
-	// r.Delete("/api/auth/delete_user", authHandler.HandleDelete())
+	r.Delete("/api/auth/delete_user", authHandler.HandleDelete())
 	// r.Get("/api/auth/check_token", authHandler.CheckToken())
 	// r.Post("/api/auth/login", authHandler.Login())
 
@@ -78,8 +79,10 @@ func main() {
 
 func getKafkaWriter(kafkaURL string) *kafka.Writer {
 	return &kafka.Writer{
-		Addr:     kafka.TCP(kafkaURL),
-		Balancer: &kafka.LeastBytes{},
+		Addr:         kafka.TCP(kafkaURL),
+		Balancer:     &kafka.LeastBytes{},
+		BatchTimeout: 10 * time.Millisecond,
+		RequiredAcks: kafka.RequireAll,
 	}
 }
 

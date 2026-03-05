@@ -121,5 +121,5 @@ func TestDeleteUser_AlreadyDeleted(t *testing.T) {
 	require.NoError(t, err)
 	defer resp2.Body.Close()
 
-	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode) // или 404
+	assert.Equal(t, http.StatusNotFound, resp2.StatusCode) // или 404
 }

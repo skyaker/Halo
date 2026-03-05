@@ -13,7 +13,7 @@ import (
 
 type AuthService interface {
 	RegisterUser(ctx context.Context, userData models.UserRegisterInfo) (string, error)
-	// DeleteUser() http.HandlerFunc
+	DeleteUser(ctx context.Context, userSessionToken string) error
 	// CheckToken() http.HandlerFunc
 	// Login() http.HandlerFunc
 }
@@ -69,7 +69,31 @@ func (s *authService) RegisterUser(
 	return token, nil
 }
 
-func (s *authService) DeleteUser() {
+func (s *authService) DeleteUser(ctx context.Context, userSessionToken string) error {
+	userId, err := s.ParseToken(userSessionToken)
+	if err != nil {
+		return fmt.Errorf("service: token parse failed: %w", err)
+	}
+
+	err = deleteUserCredentials(ctx, s.db, userId)
+	if err != nil {
+		if errors.Is(err, models.ErrNotFound) {
+			return models.ErrNotFound
+		}
+		return fmt.Errorf("service: delete user credentials failed: %w", err)
+	}
+
+	err = s.sentUserDeletedEvent(ctx, userId)
+	if err != nil {
+		return fmt.Errorf("service: send user deleted event failed: %w", err)
+	}
+
+	err = s.deleteTokensByUserId(ctx, userId)
+	if err != nil {
+		return fmt.Errorf("service: delete tokens by user id failed: %w", err)
+	}
+
+	return nil
 }
 
 // func (s *authService) CheckToken() http.HandlerFunc {

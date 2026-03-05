@@ -4,7 +4,6 @@ import (
 	models "auth_service/internal/models"
 	service "auth_service/internal/service"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"time"
 
@@ -37,11 +36,7 @@ func (h *AuthHandler) HandleRegister() http.HandlerFunc {
 		token, err := h.service.RegisterUser(r.Context(), userData)
 		if err != nil {
 			log.Error().Err(err).Msg("user registration failed")
-			if errors.Is(err, models.ErrAlreadyExists) {
-				http.Error(w, "User already exists", http.StatusBadRequest)
-				return
-			}
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			handleError(w, err)
 			return
 		}
 
@@ -59,93 +54,42 @@ func (h *AuthHandler) HandleRegister() http.HandlerFunc {
 	}
 }
 
-// func (h *AuthHandler) HandleDelete() http.HandlerFunc {
-// 	return func(w http.ResponseWriter, r *http.Request) {
-// 		session_cookie, err := r.Cookie("session_token")
-// 		if err != nil {
-// 			log.Error().Err(err).Msg("Getting cookie")
-// 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-// 			return
-// 		}
-//
-// 		user_session_token := session_cookie.Value
-//
-// 		if user_session_token == "" {
-// 			log.Error().Msg("Session token is empty")
-// 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-// 			return
-// 		}
-//
-// 		user_id, errInfo := extractUserIdFromToken(user_session_token)
-//
-// 		if errInfo != nil {
-// 			if strings.Contains(errInfo.Error(), "unauthorized") {
-// 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-// 			} else if strings.Contains(errInfo.Error(), "bad request") {
-// 				http.Error(w, "Bad request", http.StatusBadRequest)
-// 			} else {
-// 				http.Error(w, "Internal server error", http.StatusInternalServerError)
-// 			}
-// 			return
-// 		}
-//
-// 		exists, err := checkUserExistenceById(h.db, &user_id)
-// 		if err != nil {
-// 			log.Error().Err(err).Msg("check user existence")
-// 			http.Error(w, "Internal server error", http.StatusInternalServerError)
-// 			return
-// 		}
-//
-// 		if !exists {
-// 			log.Error().Err(fmt.Errorf("user not found")).Msg("user doesn't exist")
-// 			http.Error(w, "Bad request", http.StatusBadRequest)
-// 			return
-// 		}
-//
-// 		query := `DELETE FROM auth_credentials
-// 							WHERE user_id = $1`
-//
-// 		res, err := h.db.Exec(query, user_id)
-// 		if err != nil {
-// 			log.Error().Err(err).Msg("deleting user credentials")
-// 			http.Error(w, "Internal server error", http.StatusInternalServerError)
-// 			return
-// 		}
-//
-// 		if rowsAffected, _ := res.RowsAffected(); rowsAffected == 0 {
-// 			log.Error().Msg("User not found")
-// 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-// 			return
-// 		}
-//
-// 		err = h.writer.WriteMessages(r.Context(), kafka.Message{
-// 			Topic: "user-deleted",
-// 			Key:   []byte(user_id.String()),
-// 			Value: []byte(user_id.String()),
-// 		})
-// 		if err != nil {
-// 			log.Error().Err(err).Msg("kafka user-deleted message error")
-// 		} else {
-// 			log.Info().Msg("kafka message user-deleted sent")
-// 		}
-//
-// 		redisRes, err := h.redisDb.Del(context.Background(), fmt.Sprintf("user:%v", user_id)).
-// 			Result()
-// 		if err != nil {
-// 			log.Error().Err(err).Msg("redis token removal")
-// 			http.Error(w, "Internal server error", http.StatusInternalServerError)
-// 			return
-// 		}
-//
-// 		if redisRes == 0 {
-// 			log.Warn().Msg("Token not found")
-// 		}
-//
-// 		log.Info().Msg("User credentials deleted successfully")
-//
-// 		w.WriteHeader(http.StatusOK)
-// 	}
-// }
+func (h *AuthHandler) HandleDelete() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		session_cookie, err := r.Cookie("session_token")
+		if err != nil {
+			log.Error().Err(err).Msg("Getting cookie")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		user_session_token := session_cookie.Value
+
+		if user_session_token == "" {
+			log.Error().Msg("Session token is empty")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		err = h.service.DeleteUser(r.Context(), user_session_token)
+		if err != nil {
+			log.Error().Err(err).Msg("user deletion failed")
+			handleError(w, err)
+			return
+		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session_token",
+			Value:    "",
+			Path:     "/",
+			Expires:  time.Unix(0, 0),
+			MaxAge:   -1,
+			HttpOnly: true,
+		})
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
 
 // func (h *AuthHandler) Login() http.HandlerFunc {
 // 	return func(w http.ResponseWriter, r *http.Request) {
