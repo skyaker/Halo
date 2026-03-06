@@ -6,7 +6,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 )
@@ -14,7 +16,7 @@ import (
 type AuthService interface {
 	RegisterUser(ctx context.Context, userData models.UserRegisterInfo) (string, error)
 	DeleteUser(ctx context.Context, userSessionToken string) error
-	// CheckToken() http.HandlerFunc
+	CheckToken(ctx context.Context, userSessionToken string) (uuid.UUID, error)
 	// Login() http.HandlerFunc
 }
 
@@ -96,8 +98,24 @@ func (s *authService) DeleteUser(ctx context.Context, userSessionToken string) e
 	return nil
 }
 
-// func (s *authService) CheckToken() http.HandlerFunc {
-// }
-//
+func (s *authService) CheckToken(ctx context.Context, userSessionToken string) (uuid.UUID, error) {
+	userId, err := s.ParseToken(userSessionToken)
+	if err != nil {
+		return uuid.UUID{}, fmt.Errorf("service: token parse failed: %w", err)
+	}
+
+	tokens, err := s.getUserTokens(ctx, userId)
+	if err != nil {
+		return uuid.UUID{}, fmt.Errorf("service: redis token fetch failed: %w", err)
+	}
+
+	tokenFound := slices.Contains(tokens, userSessionToken)
+	if !tokenFound {
+		return uuid.UUID{}, models.ErrInvalidToken
+	}
+
+	return userId, nil
+}
+
 // func (s *authService) Login() http.HandlerFunc {
 // }

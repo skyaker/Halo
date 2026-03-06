@@ -73,3 +73,21 @@ func (s *authService) deleteTokensByUserId(ctx context.Context, userId uuid.UUID
 	}
 	return nil
 }
+
+func (s *authService) getUserTokens(ctx context.Context, userId uuid.UUID) ([]string, error) {
+	key := fmt.Sprintf("user:%v", userId)
+
+	tokens, err := s.redisDb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+		Min: fmt.Sprintf("%d", time.Now().Unix()),
+		Max: "+inf",
+	}).Result()
+	if err != nil {
+		return nil, fmt.Errorf("redis token fetch failed: %w", err)
+	}
+
+	if len(tokens) == 0 {
+		return nil, models.ErrNotFound
+	}
+
+	return tokens, nil
+}

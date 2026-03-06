@@ -64,7 +64,7 @@ func main() {
 
 	r.Post("/api/auth/register", authHandler.HandleRegister())
 	r.Delete("/api/auth/delete_user", authHandler.HandleDelete())
-	// r.Get("/api/auth/check_token", authHandler.CheckToken())
+	r.Get("/api/auth/check_token", authHandler.CheckToken())
 	// r.Post("/api/auth/login", authHandler.Login())
 
 	log.Info().Msg("Auth server is running")

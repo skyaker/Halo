@@ -91,6 +91,36 @@ func (h *AuthHandler) HandleDelete() http.HandlerFunc {
 	}
 }
 
+func (h *AuthHandler) CheckToken() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		session_cookie, err := r.Cookie("session_token")
+		if err != nil {
+			log.Error().Err(err).Msg("Unauthorized")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		user_session_token := session_cookie.Value
+
+		if user_session_token == "" {
+			log.Error().Msg("Session token is empty")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		userId, err := h.service.CheckToken(r.Context(), user_session_token)
+		if err != nil {
+			log.Error().Err(err).Msg("check token failed")
+			handleError(w, err)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"user_id": userId,
+		})
+	}
+}
+
 // func (h *AuthHandler) Login() http.HandlerFunc {
 // 	return func(w http.ResponseWriter, r *http.Request) {
 // 		var userData models.UserLogin
@@ -150,13 +180,6 @@ func (h *AuthHandler) HandleDelete() http.HandlerFunc {
 //
 // 		w.WriteHeader(http.StatusOK)
 // 	}
-// }
-//
-// func checkUserExistenceById(db *sql.DB, user_id *uuid.UUID) (bool, error) {
-// 	var exists bool
-// 	query := `SELECT EXISTS (SELECT 1 FROM auth_credentials WHERE user_id = $1)`
-// 	err := db.QueryRow(query, user_id.String()).Scan(&exists)
-// 	return exists, err
 // }
 //
 // func authInfoCheck(db *sql.DB, login *string, password *string) error {

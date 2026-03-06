@@ -6,55 +6,48 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
 )
 
-func GetSessionTokenCookie(t *testing.T, login, password string) string {
+func Test_CheckToken_Success(t *testing.T) {
+	login := "user_" + uuid.NewString()[:8]
 	user := map[string]string{
 		"login":    login,
-		"password": password,
+		"password": "password123",
+		"email":    login + "@example.com",
 	}
-
 	body, _ := json.Marshal(user)
 
 	resp, err := http.Post(
-		"http://localhost:8080/api/auth/login",
+		"http://localhost:8080/api/auth/register",
 		"application/json",
 		bytes.NewBuffer(body),
 	)
 	require.NoError(t, err)
 	defer resp.Body.Close()
-
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
+	var token string
 	for _, c := range resp.Cookies() {
 		if c.Name == "session_token" {
-			return c.Value
+			token = c.Value
+			break
 		}
 	}
-
-	t.Fatal("session_token not found in login response")
-	return ""
-}
-
-func Test_CheckToken_Success(t *testing.T) {
-	token := GetSessionTokenCookie(t, "alice", "alice123")
+	require.NotEmpty(t, token, "Token should be present after registration")
 
 	req, err := http.NewRequest("GET", "http://localhost:8080/api/auth/check_token", nil)
 	require.NoError(t, err)
-
-	req.AddCookie(&http.Cookie{
-		Name:  "session_token",
-		Value: token,
-	})
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: token})
 
 	client := &http.Client{}
-	resp, err := client.Do(req)
+	checkResp, err := client.Do(req)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer checkResp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, http.StatusOK, checkResp.StatusCode)
 }
 
 func Test_CheckToken_MissingCookie(t *testing.T) {
@@ -66,7 +59,8 @@ func Test_CheckToken_MissingCookie(t *testing.T) {
 }
 
 func Test_CheckToken_EmptyToken(t *testing.T) {
-	req, _ := http.NewRequest("GET", "http://localhost:8080/api/auth/check_token", nil)
+	req, err := http.NewRequest("GET", "http://localhost:8080/api/auth/check_token", nil)
+	require.NoError(t, err)
 	req.AddCookie(&http.Cookie{
 		Name:  "session_token",
 		Value: "",
@@ -81,10 +75,12 @@ func Test_CheckToken_EmptyToken(t *testing.T) {
 }
 
 func Test_CheckToken_InvalidToken(t *testing.T) {
-	req, _ := http.NewRequest("GET", "http://localhost:8080/api/auth/check_token", nil)
+	req, err := http.NewRequest("GET", "http://localhost:8080/api/auth/check_token", nil)
+	require.NoError(t, err)
+
 	req.AddCookie(&http.Cookie{
 		Name:  "session_token",
-		Value: "thisisnotavalidtoken",
+		Value: "invalidtoken",
 	})
 
 	client := &http.Client{}
