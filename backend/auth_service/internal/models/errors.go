@@ -8,6 +8,6 @@ var (
 	ErrInternal       = errors.New("internal server error")
 	ErrInvalidRequest = errors.New("invalid request parameters")
 
-	ErrIncorrectPassword = errors.New("incorrect password")
-	ErrInvalidToken      = errors.New("invalid token")
+	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrInvalidToken       = errors.New("invalid token")
 )

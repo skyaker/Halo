@@ -16,7 +16,7 @@ func handleError(w http.ResponseWriter, err error) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	case errors.Is(err, models.ErrInvalidRequest):
 		http.Error(w, "Invalid request", http.StatusBadRequest)
-	case errors.Is(err, models.ErrIncorrectPassword):
+	case errors.Is(err, models.ErrInvalidCredentials):
 		http.Error(w, "Incorrect password", http.StatusUnauthorized)
 	case errors.Is(err, models.ErrInvalidToken):
 		http.Error(w, "Invalid token", http.StatusUnauthorized)

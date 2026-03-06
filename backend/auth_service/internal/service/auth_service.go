@@ -17,7 +17,7 @@ type AuthService interface {
 	RegisterUser(ctx context.Context, userData models.UserRegisterInfo) (string, error)
 	DeleteUser(ctx context.Context, userSessionToken string) error
 	CheckToken(ctx context.Context, userSessionToken string) (uuid.UUID, error)
-	// Login() http.HandlerFunc
+	Login(ctx context.Context, userData models.UserLogin) (string, error)
 }
 
 type authService struct {
@@ -45,6 +45,10 @@ func (s *authService) RegisterUser(
 	ctx context.Context,
 	userData models.UserRegisterInfo,
 ) (string, error) {
+	if userData.Login == "" || userData.Password == "" {
+		return "", models.ErrInvalidRequest
+	}
+
 	userId, err := addUserCredentials(ctx, s.db, &userData)
 	if err != nil {
 		if errors.Is(err, models.ErrAlreadyExists) {
@@ -72,6 +76,10 @@ func (s *authService) RegisterUser(
 }
 
 func (s *authService) DeleteUser(ctx context.Context, userSessionToken string) error {
+	if userSessionToken == "" {
+		return models.ErrInvalidToken
+	}
+
 	userId, err := s.ParseToken(userSessionToken)
 	if err != nil {
 		return fmt.Errorf("service: token parse failed: %w", err)
@@ -99,6 +107,10 @@ func (s *authService) DeleteUser(ctx context.Context, userSessionToken string) e
 }
 
 func (s *authService) CheckToken(ctx context.Context, userSessionToken string) (uuid.UUID, error) {
+	if userSessionToken == "" {
+		return uuid.UUID{}, models.ErrInvalidToken
+	}
+
 	userId, err := s.ParseToken(userSessionToken)
 	if err != nil {
 		return uuid.UUID{}, fmt.Errorf("service: token parse failed: %w", err)
@@ -117,5 +129,20 @@ func (s *authService) CheckToken(ctx context.Context, userSessionToken string) (
 	return userId, nil
 }
 
-// func (s *authService) Login() http.HandlerFunc {
-// }
+func (s *authService) Login(ctx context.Context, userData models.UserLogin) (string, error) {
+	if userData.Login == "" || userData.Password == "" {
+		return "", models.ErrInvalidRequest
+	}
+
+	userId, err := checkCredentials(ctx, s.db, userData.Login, userData.Password)
+	if err != nil {
+		return "", fmt.Errorf("service: check credentials failed: %w", err)
+	}
+
+	token, err := s.createToken(ctx, userId)
+	if err != nil {
+		return "", fmt.Errorf("service: token creation failed: %w", err)
+	}
+
+	return token, nil
+}

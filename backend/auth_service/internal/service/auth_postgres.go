@@ -5,6 +5,7 @@ import (
 	repository "auth_service/internal/repository"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,7 +18,7 @@ func addUserCredentials(
 	db *sql.DB,
 	user *models.UserRegisterInfo,
 ) (uuid.UUID, error) {
-	exists, err := checkUserExistenceByLogin(ctx, db, &user.Login)
+	exists, err := checkUserExistenceByLogin(ctx, db, user.Login)
 	if err != nil {
 		return uuid.UUID{}, fmt.Errorf("check existence failed: %w", err)
 	}
@@ -65,7 +66,7 @@ func deleteUserCredentials(ctx context.Context, db *sql.DB, userId uuid.UUID) er
 	return nil
 }
 
-func checkUserExistenceByLogin(ctx context.Context, db *sql.DB, login *string) (bool, error) {
+func checkUserExistenceByLogin(ctx context.Context, db *sql.DB, login string) (bool, error) {
 	var exists bool
 	query := `SELECT EXISTS (SELECT 1 FROM auth_credentials WHERE login = $1)`
 	err := db.QueryRowContext(ctx, query, login).Scan(&exists)
@@ -73,4 +74,33 @@ func checkUserExistenceByLogin(ctx context.Context, db *sql.DB, login *string) (
 		return false, repository.MapError(err)
 	}
 	return exists, err
+}
+
+func checkCredentials(
+	ctx context.Context,
+	db *sql.DB,
+	login string,
+	password string,
+) (uuid.UUID, error) {
+	var hashedPassword string
+	var userId uuid.UUID
+
+	query := `SELECT user_id, password_hash
+						FROM auth_credentials
+						WHERE login = $1`
+
+	err := db.QueryRowContext(ctx, query, login).Scan(&userId, &hashedPassword)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return uuid.UUID{}, models.ErrInvalidCredentials
+		}
+		return uuid.UUID{}, fmt.Errorf("db query failed: %w", err)
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+	if err != nil {
+		return uuid.UUID{}, models.ErrInvalidCredentials
+	}
+
+	return userId, nil
 }

@@ -63,7 +63,7 @@ func TestRegister_DuplicateLogin(t *testing.T) {
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Equal(t, http.StatusConflict, resp.StatusCode)
 }
 
 func TestRegister_EmptyFields(t *testing.T) {
