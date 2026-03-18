@@ -15,16 +15,18 @@ import (
 
 type AuthService interface {
 	RegisterUser(ctx context.Context, userData models.UserRegisterInfo) (string, error)
-	DeleteUser(ctx context.Context, userSessionToken string) error
+	DeleteUser(ctx context.Context, userId uuid.UUID) error
 	CheckToken(ctx context.Context, userSessionToken string) (uuid.UUID, error)
 	Login(ctx context.Context, userData models.UserLogin) (string, error)
+	StartTokenCleanup(ctx context.Context)
 }
 
 type authService struct {
-	db        *sql.DB
-	redisDb   *redis.Client
-	writer    *kafka.Writer
-	secretKey string
+	db            *sql.DB
+	redisDb       *redis.Client
+	writer        *kafka.Writer
+	secretKey     string
+	sessionPrefix string
 }
 
 func NewAuthService(
@@ -32,12 +34,14 @@ func NewAuthService(
 	redisDb *redis.Client,
 	writer *kafka.Writer,
 	key string,
+	sessionPrefix string,
 ) AuthService {
 	return &authService{
-		db:        db,
-		redisDb:   redisDb,
-		writer:    writer,
-		secretKey: key,
+		db:            db,
+		redisDb:       redisDb,
+		writer:        writer,
+		secretKey:     key,
+		sessionPrefix: sessionPrefix,
 	}
 }
 
@@ -75,17 +79,8 @@ func (s *authService) RegisterUser(
 	return token, nil
 }
 
-func (s *authService) DeleteUser(ctx context.Context, userSessionToken string) error {
-	if userSessionToken == "" {
-		return models.ErrInvalidToken
-	}
-
-	userId, err := s.ParseToken(userSessionToken)
-	if err != nil {
-		return fmt.Errorf("service: token parse failed: %w", err)
-	}
-
-	err = deleteUserCredentials(ctx, s.db, userId)
+func (s *authService) DeleteUser(ctx context.Context, userId uuid.UUID) error {
+	err := deleteUserCredentials(ctx, s.db, userId)
 	if err != nil {
 		if errors.Is(err, models.ErrNotFound) {
 			return models.ErrNotFound

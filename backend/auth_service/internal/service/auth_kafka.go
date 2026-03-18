@@ -5,10 +5,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 )
+
+func GetKafkaWriter(kafkaURL string) *kafka.Writer {
+	return &kafka.Writer{
+		Addr:         kafka.TCP(kafkaURL),
+		Balancer:     &kafka.LeastBytes{},
+		BatchTimeout: 10 * time.Millisecond,
+		RequiredAcks: kafka.RequireAll,
+	}
+}
 
 func (s *authService) sentUserCreatedEvent(
 	ctx context.Context,

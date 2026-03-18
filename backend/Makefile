@@ -12,7 +12,6 @@ COMPOSE := docker compose -p $(PROJECT_NAME) -f $(DATABASES)
 COMPOSE_BACKEND := docker compose -p $(PROJECT_NAME) -f $(BACKEND)
 COMPOSE_KAFKA := docker compose -p $(PROJECT_NAME) -f $(KAFKA)
 
-# DIRS = note_service category_service auth_service
 DIRS = note_service user_service auth_service
 
 .PHONY: all

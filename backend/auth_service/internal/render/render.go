@@ -1,4 +1,4 @@
-package auth_handlers
+package render
 
 import (
 	models "auth_service/internal/models"
@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func handleError(w http.ResponseWriter, err error) {
+func HandleError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, models.ErrNotFound):
 		http.Error(w, "Not found", http.StatusNotFound)

@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"time"
+	"os/signal"
+	"syscall"
 
 	handlers "auth_service/internal/handlers"
+	middleware "auth_service/internal/middleware"
 	dbconn "auth_service/internal/repository"
 	service "auth_service/internal/service"
 
@@ -16,7 +18,6 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
-	"github.com/segmentio/kafka-go"
 )
 
 func main() {
@@ -40,11 +41,9 @@ func main() {
 	}
 	log.Info().Msg("Redis connection successful")
 
-	go listenForExpiredTokens(redisDb)
-
 	// kafka
 	kafkaUrl := fmt.Sprintf("%v:%v", os.Getenv("KAFKA_HOST"), os.Getenv("KAFKA_PORT"))
-	writer := getKafkaWriter(kafkaUrl)
+	writer := service.GetKafkaWriter(kafkaUrl)
 
 	log.Info().Msg("Kafka writer created")
 
@@ -56,16 +55,31 @@ func main() {
 		log.Fatal().Msg("TOKEN_SECRET_KEY environment variable is not set")
 	}
 
+	// session prefix
+	sessionPrefix, status := os.LookupEnv("REDIS_USER_PREFIX")
+	if !status {
+		log.Fatal().Msg("SESSION_PREFIX environment variable is not set")
+	}
+
 	// router
 	r := chi.NewRouter()
 
-	authService := service.NewAuthService(db, redisDb, writer, key)
+	authService := service.NewAuthService(db, redisDb, writer, key, sessionPrefix)
 	authHandler := handlers.NewAuthHandler(authService)
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go authService.StartTokenCleanup(ctx)
+
 	r.Post("/api/auth/register", authHandler.HandleRegister())
-	r.Delete("/api/auth/delete_user", authHandler.HandleDelete())
-	r.Get("/api/auth/check_token", authHandler.CheckToken())
 	r.Post("/api/auth/login", authHandler.Login())
+
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(authService))
+		r.Delete("/api/auth/delete_user", authHandler.HandleDelete())
+		r.Get("/api/auth/me", authHandler.HandleMe())
+	})
 
 	log.Info().Msg("Auth server is running")
 	err = http.ListenAndServe(":8080", r)
@@ -74,42 +88,5 @@ func main() {
 			Err(err).
 			Str("service", "auth service").
 			Msg("Server start failed")
-	}
-}
-
-func getKafkaWriter(kafkaURL string) *kafka.Writer {
-	return &kafka.Writer{
-		Addr:         kafka.TCP(kafkaURL),
-		Balancer:     &kafka.LeastBytes{},
-		BatchTimeout: 10 * time.Millisecond,
-		RequiredAcks: kafka.RequireAll,
-	}
-}
-
-func listenForExpiredTokens(redisDb *redis.Client) {
-	ctx := context.Background()
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		now := time.Now().Unix()
-		users, err := redisDb.Keys(ctx, "user:*").Result()
-		if err != nil {
-			log.Error().Err(err).Msg("Error fetching keys")
-			continue
-		}
-
-		for _, userKey := range users {
-			removed, err := redisDb.ZRemRangeByScore(ctx, userKey, "0", fmt.Sprintf("%d", now)).
-				Result()
-			if err != nil {
-				log.Error().Err(err).Msg("Error moving expired tokens")
-				continue
-			}
-
-			if removed > 0 {
-				log.Info().Msgf("Removed %d expired tokens from %s\n", removed, userKey)
-			}
-		}
 	}
 }

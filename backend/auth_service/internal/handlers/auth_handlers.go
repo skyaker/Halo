@@ -1,12 +1,15 @@
 package auth_handlers
 
 import (
+	middleware "auth_service/internal/middleware"
 	models "auth_service/internal/models"
+	render "auth_service/internal/render"
 	service "auth_service/internal/service"
 	"encoding/json"
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -31,7 +34,7 @@ func (h *AuthHandler) HandleRegister() http.HandlerFunc {
 		token, err := h.service.RegisterUser(r.Context(), userData)
 		if err != nil {
 			log.Error().Err(err).Msg("user registration failed")
-			handleError(w, err)
+			render.HandleError(w, err)
 			return
 		}
 
@@ -51,19 +54,17 @@ func (h *AuthHandler) HandleRegister() http.HandlerFunc {
 
 func (h *AuthHandler) HandleDelete() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		session_cookie, err := r.Cookie("session_token")
-		if err != nil {
-			log.Error().Err(err).Msg("Getting cookie")
+		userId, ok := r.Context().Value(middleware.UserIdKey).(uuid.UUID)
+		if !ok {
+			log.Error().Msg("user id not found")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		user_session_token := session_cookie.Value
-
-		err = h.service.DeleteUser(r.Context(), user_session_token)
+		err := h.service.DeleteUser(r.Context(), userId)
 		if err != nil {
 			log.Error().Err(err).Msg("user deletion failed")
-			handleError(w, err)
+			render.HandleError(w, err)
 			return
 		}
 
@@ -80,7 +81,7 @@ func (h *AuthHandler) HandleDelete() http.HandlerFunc {
 	}
 }
 
-func (h *AuthHandler) CheckToken() http.HandlerFunc {
+func (h *AuthHandler) HandleMe() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session_cookie, err := r.Cookie("session_token")
 		if err != nil {
@@ -94,7 +95,7 @@ func (h *AuthHandler) CheckToken() http.HandlerFunc {
 		userId, err := h.service.CheckToken(r.Context(), user_session_token)
 		if err != nil {
 			log.Error().Err(err).Msg("check token failed")
-			handleError(w, err)
+			render.HandleError(w, err)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -117,7 +118,7 @@ func (h *AuthHandler) Login() http.HandlerFunc {
 		token, err := h.service.Login(r.Context(), userData)
 		if err != nil {
 			log.Error().Err(err).Msg("user login failed")
-			handleError(w, err)
+			render.HandleError(w, err)
 			return
 		}
 

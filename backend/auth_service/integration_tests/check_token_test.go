@@ -38,7 +38,7 @@ func Test_CheckToken_Success(t *testing.T) {
 	}
 	require.NotEmpty(t, token, "Token should be present after registration")
 
-	req, err := http.NewRequest("GET", "http://localhost:8080/api/auth/check_token", nil)
+	req, err := http.NewRequest("GET", "http://localhost:8080/api/auth/me", nil)
 	require.NoError(t, err)
 	req.AddCookie(&http.Cookie{Name: "session_token", Value: token})
 
@@ -51,7 +51,7 @@ func Test_CheckToken_Success(t *testing.T) {
 }
 
 func Test_CheckToken_MissingCookie(t *testing.T) {
-	resp, err := http.Get("http://localhost:8080/api/auth/check_token")
+	resp, err := http.Get("http://localhost:8080/api/auth/me")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -59,7 +59,7 @@ func Test_CheckToken_MissingCookie(t *testing.T) {
 }
 
 func Test_CheckToken_EmptyToken(t *testing.T) {
-	req, err := http.NewRequest("GET", "http://localhost:8080/api/auth/check_token", nil)
+	req, err := http.NewRequest("GET", "http://localhost:8080/api/auth/me", nil)
 	require.NoError(t, err)
 	req.AddCookie(&http.Cookie{
 		Name:  "session_token",
@@ -75,7 +75,7 @@ func Test_CheckToken_EmptyToken(t *testing.T) {
 }
 
 func Test_CheckToken_InvalidToken(t *testing.T) {
-	req, err := http.NewRequest("GET", "http://localhost:8080/api/auth/check_token", nil)
+	req, err := http.NewRequest("GET", "http://localhost:8080/api/auth/me", nil)
 	require.NoError(t, err)
 
 	req.AddCookie(&http.Cookie{
